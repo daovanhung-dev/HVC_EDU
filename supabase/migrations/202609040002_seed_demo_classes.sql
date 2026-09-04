@@ -1,4 +1,8 @@
 -- Optional seed based on the August workbook snapshot. Remove if you want an empty production database.
+insert into public.centers(code, name, status)
+values ('HC', 'Trung tâm Hùng Cường', 'ACTIVE')
+on conflict (code) do nothing;
+
 insert into public.classes(center_id, code, name, grade, subject, standard_unit_fee, collection_method)
 select c.id, v.code, v.name, v.grade, 'Toán', v.fee, v.method::public.collection_method
 from public.centers c

@@ -17,12 +17,13 @@ import { AuthService } from '../../core/auth/auth.service';
         </div>
 
         <label>Email<input type="email" name="email" [(ngModel)]="email" autocomplete="email" required /></label>
-        <label>Mật khẩu<input type="password" name="password" [(ngModel)]="password" autocomplete="current-password" required /></label>
+        <label>Mật khẩu<div class="password-field"><input [type]="showPassword ? 'text' : 'password'" name="password" [(ngModel)]="password" autocomplete="current-password" required /><button class="secondary" type="button" (click)="showPassword=!showPassword">{{ showPassword ? 'Ẩn' : 'Hiện' }}</button></div></label>
 
         @if (error()) { <div class="alert">{{ error() }}</div> }
         <button class="primary" type="submit" [disabled]="loading()">
           {{ loading() ? 'Đang đăng nhập…' : 'Đăng nhập' }}
         </button>
+        <button class="button-link link-button" type="button" (click)="forgotPassword()">Quên mật khẩu?</button>
       </form>
     </main>
   `,
@@ -30,6 +31,7 @@ import { AuthService } from '../../core/auth/auth.service';
 export class LoginComponent {
   email = '';
   password = '';
+  showPassword = false;
   readonly loading = signal(false);
   readonly error = signal('');
 
@@ -46,5 +48,13 @@ export class LoginComponent {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  async forgotPassword(): Promise<void> {
+    if (!this.email.trim()) { this.error.set('Nhập email trước khi yêu cầu đặt lại mật khẩu.'); return; }
+    try {
+      await this.auth.resetPassword(this.email.trim());
+      this.error.set('Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi.');
+    } catch (error) { this.error.set(error instanceof Error ? error.message : 'Không thể gửi email đặt lại mật khẩu.'); }
   }
 }

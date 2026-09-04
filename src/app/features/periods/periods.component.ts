@@ -1,0 +1,29 @@
+import { Component, OnInit, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { EdgeFunctionService } from '../../core/api/edge-function.service';
+import { PeriodContextService } from '../../core/services/period-context.service';
+import { ToastService } from '../../core/services/toast.service';
+import { formatMoney } from '../../core/utils/money.util';
+import { AuthService } from '../../core/auth/auth.service';
+
+@Component({ selector: 'app-periods', standalone: true, imports: [FormsModule], template: `
+<section class="page-header"><div><p class="eyebrow">HỆ THỐNG</p><h1>Kỳ kế toán</h1><p class="muted">Mọi nghiệp vụ tài chính sử dụng kỳ đang chọn.</p></div><div>@if(auth.role()==='ADMIN'){<button class="secondary" (click)="integrity()">Kiểm tra dữ liệu</button><button class="primary" (click)="showForm=!showForm">{{showForm?'Đóng':'+ Tạo kỳ'}}</button>}</div></section>
+@if(showForm&&auth.role()==='ADMIN'){<form class="card form-card" (ngSubmit)="create()"><div class="form-grid"><label>Năm<input name="year" type="number" [(ngModel)]="form.year" /></label><label>Tháng<input name="month" type="number" min="1" max="12" [(ngModel)]="form.month" /></label><label>Bắt đầu<input name="start" type="date" [(ngModel)]="form.start_date" /></label><label>Kết thúc<input name="end" type="date" [(ngModel)]="form.end_date" /></label></div><button class="primary">Tạo kỳ</button></form>}
+@if(error()){<div class="alert">{{error()}}</div>}
+<div class="card table-wrap"><table><thead><tr><th>Kỳ</th><th>Khoảng ngày</th><th>Trạng thái</th><th>Version</th><th></th></tr></thead><tbody>@for(p of periods.periods();track p.id){<tr><td>{{p.month}}/{{p.year}}</td><td>{{p.start_date}} → {{p.end_date}}</td><td><span class="badge" [class.active]="p.status==='OPEN'" [class.closed]="p.status==='CLOSED'">{{p.status}}</span></td><td>{{p.version}}</td><td><button class="secondary" (click)="select(p)">Chọn</button>@if(p.status==='OPEN'){<button class="primary" (click)="preview(p)">Preview đóng</button>}</td></tr>}@empty{<tr><td colspan="5" class="empty">Chưa có kỳ kế toán.</td></tr>}</tbody></table></div>
+@if(previewData()){<section class="card section-card"><h2>Preview đóng kỳ</h2><div class="stat-list"><div><span>Phải thu học phí</span><strong>{{money(previewData().finance?.tuition_income)}}</strong></div><div><span>Payroll</span><strong>{{money(previewData().payroll?.total_amount)}}</strong></div><div><span>Lợi nhuận trước quỹ</span><strong>{{money(previewData().profit_before_fund)}}</strong></div><div><span>Trích quỹ</span><strong>{{money(previewData().fund_contribution)}}</strong></div><div><span>Phân phối</span><strong>{{money(previewData().distributable_profit)}}</strong></div></div><p>Blockers: {{previewData().blockers.join(', ')||'Không có'}}</p>@if(auth.role()==='ADMIN'){<button class="primary" [disabled]="previewData().blockers.length>0" (click)="close()">Đóng kỳ</button>}</section>}
+@if(integrityData()){<section class="card section-card"><h2>Kiểm tra toàn vẹn</h2><p class="{{integrityData().summary.errorCount ? 'danger' : 'success'}}">{{integrityData().summary.errorCount}} lỗi · {{integrityData().summary.warningCount}} cảnh báo</p>@for(issue of integrityData().issues;track issue.code+issue.message){<p><strong>{{issue.code}}</strong> · {{issue.message}}</p>}@empty{<p class="success">Không phát hiện vấn đề.</p>}</section>}
+` })
+export class PeriodsComponent implements OnInit {
+  error = signal(''); showForm = false; previewData = signal<any>(null); integrityData = signal<any>(null);
+  form = { year: new Date().getFullYear(), month: new Date().getMonth() + 1, start_date: '', end_date: '' };
+  constructor(readonly periods: PeriodContextService, private readonly edge: EdgeFunctionService, private readonly toast: ToastService, readonly auth: AuthService) {}
+  ngOnInit() { this.setDates(); }
+  setDates() { const first = new Date(this.form.year, this.form.month - 1, 1); const last = new Date(this.form.year, this.form.month, 0); this.form.start_date = first.toISOString().slice(0, 10); this.form.end_date = last.toISOString().slice(0, 10); }
+  select(period: any) { this.periods.select(period); this.toast.success(`Đã chọn kỳ ${period.month}/${period.year}.`); }
+  async create() { try { await this.edge.invoke('create-period', this.form); await this.periods.load(); this.showForm = false; this.toast.success('Đã tạo kỳ.'); } catch (error) { this.error.set(error instanceof Error ? error.message : 'Không thể tạo kỳ.'); } }
+  async preview(period: any) { try { this.periods.select(period); this.previewData.set(await this.edge.invoke('close-period-preview', { period_id: period.id })); } catch (error) { this.error.set(error instanceof Error ? error.message : 'Không thể preview đóng kỳ.'); } }
+  async close() { const period = this.periods.current(); if (!period) return; try { await this.edge.invoke('close-period', { period_id: period.id, expected_version: period.version }); this.toast.success('Đã đóng kỳ.'); this.previewData.set(null); await this.periods.load(); } catch (error) { this.error.set(error instanceof Error ? error.message : 'Không thể đóng kỳ.'); } }
+  async integrity() { const period = this.periods.current(); if (!period) return; try { this.integrityData.set(await this.edge.invoke('data-integrity-check', { period_id: period.id })); } catch (error) { this.error.set(error instanceof Error ? error.message : 'Không thể kiểm tra dữ liệu.'); } }
+  money(value: unknown) { return formatMoney(Number(value || 0)); }
+}

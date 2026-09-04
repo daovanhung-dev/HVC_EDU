@@ -30,11 +30,10 @@ npx supabase db reset
 npx supabase status
 ```
 
-Lấy `API URL` và **publishable key** từ `npx supabase status`, sau đó:
+Lấy `API URL` và **publishable key** từ `supabase status`, sau đó cập nhật
+`src/app/core/config/supabase.constants.ts` (chỉ đặt public/publishable key), rồi:
 
 ```bash
-export SUPABASE_URL='http://127.0.0.1:54321'
-export SUPABASE_PUBLISHABLE_KEY='PASTE_PUBLISHABLE_KEY'
 npm start
 ```
 
@@ -74,13 +73,18 @@ Health check:
 curl http://127.0.0.1:54321/functions/v1/health
 ```
 
-Các function init đã có:
+Các function hiện có:
 
 - `health`
 - `dashboard-summary`
 - `attendance-bulk-upsert`
+- `generate-month-sessions`, `evaluation-bulk-upsert`
+- `tuition-preview`, `generate-tuition`, `tuition-summary`
+- `record-payment`, `void-payment`, `create-tuition-adjustment`, `carry-over-period`
+- `calculate-payroll`, `approve-payroll`, `close-period-preview`, `close-period`
+- `data-integrity-check`, `import-center-workbook`, `update-profile-role`
 
-Các nghiệp vụ tài chính còn lại nên tiếp tục theo BD và bắt buộc đi qua Edge Function/DB transaction.
+Các nghiệp vụ tài chính, payroll, đóng kỳ và thay đổi quyền đều đi qua Edge Function → RPC transaction → audit log.
 
 ## 5. Generate DB types
 
@@ -90,18 +94,14 @@ Sau khi migration ổn định:
 npm run supabase:types
 ```
 
-> `database.types.ts` đang được `.gitignore` để tránh commit file cũ nếu schema thay đổi liên tục. Khi project ổn định có thể bỏ ignore và commit type generated.
+> Khi có Supabase local, chạy lệnh trên để refresh type contract theo migration. Workspace hiện giữ một contract tối thiểu để frontend vẫn biên dịch khi Docker chưa có.
 
 ## 6. Deploy GitHub Pages
 
 Repository Settings → Pages → Source = **GitHub Actions**.
 
-Tạo GitHub Repository Variables:
-
-- `SUPABASE_URL`
-- `SUPABASE_PUBLISHABLE_KEY`
-
-Publishable key được phép xuất hiện ở browser; **không đặt secret/service key vào Angular**.
+Publishable key được phép xuất hiện ở browser trong file constants; **không đặt
+secret/service key vào Angular**.
 
 Push `main` sẽ chạy `.github/workflows/deploy-pages.yml`.
 
@@ -162,8 +162,20 @@ supabase/
 - Không dùng `service_role`/secret key trong browser.
 - Không xóa cứng payment/payroll/audit.
 - Mọi logic tài chính quan trọng phải idempotent + transaction + audit.
+- Không dùng `.env`/`environment.ts` cho cấu hình Supabase frontend.
 
-## 10. Roadmap ưu tiên
+## 10. Kiểm thử và chất lượng
+
+```bash
+npm ci
+npm test
+npm run build
+/home/daovanhung/.local/bin/deno check --no-config --node-modules-dir=auto supabase/functions/_shared/*.ts supabase/functions/*/index.ts
+```
+
+Nếu có Docker, xác thực migration bằng `npm run supabase:start`, `npm run supabase:reset` và `npm run supabase:status` trước khi dùng `npm run supabase:types`.
+
+## 11. Roadmap ưu tiên
 
 1. Auth + profile/role.
 2. CRUD Class/Student/Enrollment.
