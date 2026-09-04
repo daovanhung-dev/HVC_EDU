@@ -3,6 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { SupabaseService } from '../../core/supabase/supabase.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
+import { LoadingStateComponent } from '../../shared/components/loading-state.component';
 
 type StudentRow = {
   id: string;
@@ -16,7 +18,7 @@ type StudentRow = {
 @Component({
   selector: 'app-students',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, StatusBadgeComponent, LoadingStateComponent],
   template: `
     <section class="page-header">
       <div><p class="eyebrow">ĐÀO TẠO</p><h1>Học sinh</h1><p class="muted">Hồ sơ, phụ huynh và lịch sử xếp lớp.</p></div>
@@ -28,19 +30,20 @@ type StudentRow = {
       <label>Trạng thái<select [(ngModel)]="status"><option value="">Tất cả</option><option value="ACTIVE">Đang học</option><option value="INACTIVE">Tạm nghỉ</option><option value="GRADUATED">Đã hoàn thành</option></select></label>
       <button class="secondary" type="button" (click)="load()">Làm mới</button>
     </div>
-    <div class="card table-wrap"><table>
+    @if (loading()) { <app-loading-state label="Đang tải danh sách học sinh…" /> } @else { <div class="card table-wrap"><table>
       <thead><tr><th>Mã</th><th>Họ tên</th><th>Phụ huynh</th><th>SĐT phụ huynh</th><th>Trạng thái</th></tr></thead>
       <tbody>
         @for (item of filtered(); track item.id) {
-          <tr><td><a class="button-link" [routerLink]="['/students', item.id]">{{ item.code }}</a></td><td>{{ item.full_name }}</td><td>{{ item.parent_name || '—' }}</td><td>{{ item.parent_phone || '—' }}</td><td><span class="badge" [class.active]="item.status === 'ACTIVE'">{{ item.status }}</span></td></tr>
+          <tr><td><a class="button-link" [routerLink]="['/students', item.id]">{{ item.code }}</a></td><td>{{ item.full_name }}</td><td>{{ item.parent_name || '—' }}</td><td>{{ item.parent_phone || '—' }}</td><td><app-status-badge [value]="item.status" /></td></tr>
         } @empty { <tr><td colspan="5" class="empty">Chưa có học sinh trong phạm vi quyền hiện tại.</td></tr>}
       </tbody>
-    </table></div>
+    </table></div> }
   `,
 })
 export class StudentsComponent implements OnInit {
   readonly items = signal<StudentRow[]>([]);
   readonly error = signal('');
+  readonly loading = signal(true);
   search = '';
   status = '';
 
@@ -50,12 +53,17 @@ export class StudentsComponent implements OnInit {
 
   async load() {
     this.error.set('');
-    const { data, error } = await this.supabase.client
-      .from('students')
-      .select('id,code,full_name,parent_name,parent_phone,status')
-      .order('full_name');
-    if (error) this.error.set(error.message);
-    else this.items.set((data ?? []) as StudentRow[]);
+    this.loading.set(true);
+    try {
+      const { data, error } = await this.supabase.client
+        .from('students')
+        .select('id,code,full_name,parent_name,parent_phone,status')
+        .order('full_name');
+      if (error) this.error.set(error.message);
+      else this.items.set((data ?? []) as StudentRow[]);
+    } finally {
+      this.loading.set(false);
+    }
   }
 
   filtered() {

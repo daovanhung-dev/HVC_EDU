@@ -6,15 +6,16 @@ import { PeriodContextService } from '../../core/services/period-context.service
 import { ToastService } from '../../core/services/toast.service';
 import { ConfirmService } from '../../core/services/confirm.service';
 import { formatMoney } from '../../core/utils/money.util';
+import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 
 @Component({
   selector: 'app-tuition-class',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, StatusBadgeComponent],
   template: `
     <section class="page-header"><div><p class="eyebrow">HỌC PHÍ</p><h1>{{class()?.code||'Lớp'}} · {{class()?.name}}</h1><p class="muted">Ledger từng học sinh trong kỳ.</p></div><div><button class="primary" [disabled]="generating" (click)="generate()">{{generating?'Đang sinh…':'Sinh / cập nhật học phí'}}</button><a class="secondary" routerLink="/finance/tuition">Tổng quan</a></div></section>
     @if(error()){<div class="alert">{{error()}}</div>}
-    <div class="card table-wrap"><table><thead><tr><th>Học sinh</th><th>Đơn giá</th><th>Buổi tính phí</th><th>Phải thu</th><th>Đã thu</th><th>Nợ</th><th>Trạng thái</th><th></th></tr></thead><tbody>@for(l of ledgers();track l.id){<tr><td>{{l.enrollment?.student?.code}} · {{l.enrollment?.student?.full_name}}</td><td>{{money(l.unit_price)}}</td><td>{{l.billable_sessions}}</td><td>{{money(l.amount_due)}}</td><td>{{money(l.paid_amount)}}</td><td class="danger">{{money(l.debt_amount)}}</td><td><span class="badge" [class.paid]="l.status==='PAID'" [class.partial]="l.status==='PARTIAL'">{{l.status}}</span></td><td><a class="button-link" [routerLink]="['/finance/payments/new']" [queryParams]="{ledgerId:l.id}">Thu</a></td></tr>}@empty{<tr><td colspan="8" class="empty">Chưa có ledger trong kỳ.</td></tr>}</tbody></table></div>
+    <div class="card table-wrap"><table><thead><tr><th>Học sinh</th><th>Đơn giá</th><th>Buổi tính phí</th><th>Phải thu</th><th>Đã thu</th><th>Nợ</th><th>Trạng thái</th><th></th></tr></thead><tbody>@for(l of ledgers();track l.id){<tr><td>{{l.enrollment?.student?.code}} · {{l.enrollment?.student?.full_name}}</td><td>{{money(l.unit_price)}}</td><td>{{l.billable_sessions}}</td><td>{{money(l.amount_due)}}</td><td>{{money(l.paid_amount)}}</td><td class="danger">{{money(l.debt_amount)}}</td><td><app-status-badge [value]="l.status" /></td><td><a class="button-link" [routerLink]="['/finance/payments/new']" [queryParams]="{ledgerId:l.id}">Thu</a></td></tr>}@empty{<tr><td colspan="8" class="empty">Chưa có ledger trong kỳ.</td></tr>}</tbody></table></div>
     <section class="card section-card"><h2>Lịch sử thanh toán</h2><div class="table-wrap"><table><thead><tr><th>Ngày thu</th><th>Số tiền</th><th>Phương thức</th><th>Tham chiếu</th><th>Trạng thái</th><th></th></tr></thead><tbody>@for(p of payments();track p.id){<tr><td>{{p.paid_at}}</td><td>{{money(p.amount)}}</td><td>{{p.method}}</td><td>{{p.reference||'—'}}</td><td>{{p.voided_at?'Đã void':'Hiệu lực'}}</td><td>@if(!p.voided_at){<button class="secondary" (click)="voidPayment(p)">Void</button>}</td></tr>}@empty{<tr><td colspan="6" class="empty">Chưa có thanh toán.</td></tr>}</tbody></table></div></section>
   `,
 })

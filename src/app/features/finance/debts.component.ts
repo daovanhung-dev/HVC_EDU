@@ -5,11 +5,12 @@ import { EdgeFunctionService } from '../../core/api/edge-function.service';
 import { PeriodContextService } from '../../core/services/period-context.service';
 import { ToastService } from '../../core/services/toast.service';
 import { formatMoney } from '../../core/utils/money.util';
+import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 
 @Component({
   selector: 'app-debts',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, StatusBadgeComponent],
   template: `
     <section class="page-header"><div><p class="eyebrow">TÀI CHÍNH</p><h1>Công nợ & điều chỉnh</h1><p class="muted">Điều chỉnh có lý do và carry-over được audit, không xoá lịch sử.</p></div><button class="secondary" (click)="load()">Làm mới</button></section>
     @if(error()){<div class="alert">{{error()}}</div>}
@@ -18,7 +19,7 @@ import { formatMoney } from '../../core/utils/money.util';
       <form class="card form-card" (ngSubmit)="carryOver()"><h2>Carry-over sang kỳ sau</h2><label>Kỳ đích<select name="to_period_id" [(ngModel)]="carryForm.to_period_id"><option value="">Chọn kỳ OPEN</option>@for(p of openTargets();track p.id){<option [value]="p.id">{{p.month}}/{{p.year}}</option>}</select></label><p class="muted">Chỉ chuyển phần nợ còn lại của kỳ {{period.current()?.month}}/{{period.current()?.year}}.</p><button class="primary" [disabled]="!carryForm.to_period_id">Carry-over</button></form>
     </div>
     <div class="toolbar"><label>Tìm kiếm<input [(ngModel)]="search" placeholder="Học sinh" /></label><label>Chỉ còn nợ<select [(ngModel)]="onlyDebt"><option value="true">Có</option><option value="false">Tất cả</option></select></label></div>
-    <div class="card table-wrap"><table><thead><tr><th>Học sinh</th><th>Lớp</th><th>Nợ đầu kỳ</th><th>Phải thu</th><th>Đã thu</th><th>Nợ hiện tại</th><th>Trạng thái</th></tr></thead><tbody>@for(l of filtered();track l.id){<tr><td>{{l.enrollment?.student?.full_name}}</td><td>{{l.enrollment?.class?.code}}</td><td>{{money(l.opening_debt)}}</td><td>{{money(l.amount_due)}}</td><td>{{money(l.paid_amount)}}</td><td class="danger">{{money(l.debt_amount)}}</td><td>{{l.status}}</td></tr>}@empty{<tr><td colspan="7" class="empty">Không có công nợ.</td></tr>}</tbody></table></div>
+    <div class="card table-wrap"><table><thead><tr><th>Học sinh</th><th>Lớp</th><th>Nợ đầu kỳ</th><th>Phải thu</th><th>Đã thu</th><th>Nợ hiện tại</th><th>Trạng thái</th></tr></thead><tbody>@for(l of filtered();track l.id){<tr><td>{{l.enrollment?.student?.full_name}}</td><td>{{l.enrollment?.class?.code}}</td><td>{{money(l.opening_debt)}}</td><td>{{money(l.amount_due)}}</td><td>{{money(l.paid_amount)}}</td><td class="danger">{{money(l.debt_amount)}}</td><td><app-status-badge [value]="l.status" /></td></tr>}@empty{<tr><td colspan="7" class="empty">Không có công nợ.</td></tr>}</tbody></table></div>
   `,
 })
 export class DebtsComponent implements OnInit {

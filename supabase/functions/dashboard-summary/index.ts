@@ -4,6 +4,26 @@ import { errorResponse, finish, preflight } from '../_shared/rpc.ts';
 import { jsonBody } from '../_shared/validation.ts';
 import { ok } from '../_shared/response.ts';
 
+type DashboardTask = {
+  code: 'ATTENDANCE_PENDING' | 'EVALUATION_PENDING' | 'TUITION_LEDGER_PENDING' | 'PAYROLL_PENDING_APPROVAL' | 'INTEGRITY_WARNING';
+  count: number;
+  severity: 'INFO' | 'WARNING' | 'BLOCKED';
+  label: string;
+  route: string;
+  actionLabel: string;
+};
+
+type SessionState = {
+  id: string;
+  class_id: string;
+  session_date: string;
+  start_time: string | null;
+  status: string;
+  class?: { code?: string; name?: string } | null;
+  attendanceMarked: boolean;
+  evaluationMarked: boolean;
+};
+
 export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any) => {
   const traceId = crypto.randomUUID();
   if (request.method === 'OPTIONS') return preflight(request);
@@ -15,14 +35,14 @@ export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any)
     const { data: periods, error: periodError } = await periodQuery;
     if (periodError) throw periodError;
     const period = periods?.[0] as { id: string; year: number; month: number; status: string; start_date: string; end_date: string } | undefined;
-    if (!period) return finish(request, ok({ period: null, activeClasses: 0, activeStudents: 0, totalDue: 0, totalPaid: 0, totalDebt: 0, payrollTotal: 0, alerts: [], role: profile.role }, traceId));
+    if (!period) return finish(request, ok({ period: null, activeClasses: 0, activeStudents: 0, totalDue: 0, totalPaid: 0, totalDebt: 0, payrollTotal: 0, alerts: [], role: profile.role, tasks: [], upcomingSessions: [] }, traceId));
     const [classes, students, finance, payroll, sessions, enrollments, ledgers] = await Promise.all([
       ctx.supabase.from('classes').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
       ctx.supabase.from('students').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
       ctx.supabase.from('v_finance_period_summary').select('*').eq('period_id', period.id).maybeSingle(),
       ctx.supabase.from('payroll_runs').select('total_amount,status').eq('period_id', period.id).maybeSingle(),
-      ctx.supabase.from('class_sessions').select('id,status').eq('period_id', period.id).neq('status', 'CANCELLED'),
-      ctx.supabase.from('enrollments').select('id,enrolled_from,enrolled_to,status').eq('status', 'ACTIVE'),
+      ctx.supabase.from('class_sessions').select('id,class_id,session_date,start_time,status,class:classes(code,name)').eq('period_id', period.id).neq('status', 'CANCELLED').order('session_date', { ascending: true }),
+      ctx.supabase.from('enrollments').select('id,class_id,enrolled_from,enrolled_to,status').eq('status', 'ACTIVE'),
       ctx.supabase.from('tuition_ledgers').select('enrollment_id,paid_amount,debt_amount').eq('period_id', period.id),
     ]);
     if (classes.error) throw classes.error;
@@ -38,13 +58,40 @@ export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any)
       totalPaid = (ledgers.data ?? []).reduce((sum: number, item: any) => sum + Number(item.paid_amount ?? 0), 0);
       totalDebt = (ledgers.data ?? []).reduce((sum: number, item: any) => sum + Number(item.debt_amount ?? 0), 0);
     }
-    const sessionIds = (sessions.data ?? []).map((item: any) => item.id);
-    const attendance = sessionIds.length ? await ctx.supabase.from('attendance').select('session_id').in('session_id', sessionIds) : { data: [], error: null };
+    const sessionRows = (sessions.data ?? []) as SessionState[];
+    const sessionIds = sessionRows.map((item) => item.id);
+    const [attendance, evaluations] = await Promise.all([
+      sessionIds.length ? ctx.supabase.from('attendance').select('session_id,enrollment_id').in('session_id', sessionIds) : Promise.resolve({ data: [], error: null }),
+      sessionIds.length ? ctx.supabase.from('student_session_evaluations').select('session_id,enrollment_id').in('session_id', sessionIds) : Promise.resolve({ data: [], error: null }),
+    ]);
     if (attendance.error) throw attendance.error;
-    const markedIds = new Set((attendance.data ?? []).map((item: any) => item.session_id));
+    if (evaluations.error) throw evaluations.error;
+    const attendanceBySession = new Map<string, Set<string>>();
+    const evaluationBySession = new Map<string, Set<string>>();
+    for (const row of attendance.data ?? []) {
+      const rows = attendanceBySession.get(row.session_id) ?? new Set<string>();
+      rows.add(row.enrollment_id);
+      attendanceBySession.set(row.session_id, rows);
+    }
+    for (const row of evaluations.data ?? []) {
+      const rows = evaluationBySession.get(row.session_id) ?? new Set<string>();
+      rows.add(row.enrollment_id);
+      evaluationBySession.set(row.session_id, rows);
+    }
     const alerts: string[] = [];
-    if (sessionIds.some((id: string) => !markedIds.has(id))) alerts.push('Có buổi học chưa được điểm danh');
     const activeEnrollments = (enrollments.data ?? []).filter((item: any) => item.enrolled_from <= period.end_date && (!item.enrolled_to || item.enrolled_to >= period.start_date));
+    const today = new Date().toISOString().slice(0, 10);
+    const sessionStates = sessionRows.map((session) => {
+      const roster = activeEnrollments.filter((enrollment: any) => enrollment.class_id === session.class_id && enrollment.enrolled_from <= session.session_date && (!enrollment.enrolled_to || enrollment.enrolled_to >= session.session_date));
+      const attendanceRows = attendanceBySession.get(session.id) ?? new Set<string>();
+      const evaluationRows = evaluationBySession.get(session.id) ?? new Set<string>();
+      const attendanceMarked = roster.length > 0 && roster.every((enrollment: any) => attendanceRows.has(enrollment.id));
+      const evaluationMarked = roster.length > 0 && roster.every((enrollment: any) => evaluationRows.has(enrollment.id));
+      return { ...session, attendanceMarked, evaluationMarked };
+    });
+    const pendingAttendanceCount = sessionStates.filter((session) => (session.status === 'COMPLETED' || session.session_date < today) && activeEnrollments.some((enrollment: any) => enrollment.class_id === session.class_id && enrollment.enrolled_from <= session.session_date && (!enrollment.enrolled_to || enrollment.enrolled_to >= session.session_date)) && !session.attendanceMarked).length;
+    const pendingEvaluationCount = sessionStates.filter((session) => (session.status === 'COMPLETED' || session.session_date < today) && activeEnrollments.some((enrollment: any) => enrollment.class_id === session.class_id && enrollment.enrolled_from <= session.session_date && (!enrollment.enrolled_to || enrollment.enrolled_to >= session.session_date)) && !session.evaluationMarked).length;
+    if (pendingAttendanceCount > 0 && ['ADMIN', 'TEACHER', 'ASSISTANT'].includes(profile.role)) alerts.push('Có buổi học chưa được điểm danh đầy đủ');
     const ledgerIds = new Set((ledgers.data ?? []).map((item: any) => item.enrollment_id));
     if (['ADMIN','ACCOUNTANT'].includes(profile.role) && activeEnrollments.some((item: any) => !ledgerIds.has(item.id))) alerts.push('Có enrollment active chưa có ledger');
     if (['ADMIN','ACCOUNTANT'].includes(profile.role) && (!payroll.data || payroll.data.status !== 'APPROVED')) alerts.push('Payroll chưa được duyệt');
@@ -59,8 +106,26 @@ export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any)
     const fundPercent = Number(fundSetting.data?.value_json?.fund_percent ?? 0.10);
     const fundContribution = Math.floor(Math.max(0, profitBeforeFund) * fundPercent);
     const distributableProfit = Math.max(0, profitBeforeFund - fundContribution);
+    const tasks: DashboardTask[] = [];
+    if (['ADMIN', 'TEACHER', 'ASSISTANT'].includes(profile.role) && pendingAttendanceCount > 0) tasks.push({ code: 'ATTENDANCE_PENDING', count: pendingAttendanceCount, severity: 'WARNING', label: 'Buổi học chưa điểm danh', route: '/attendance', actionLabel: 'Mở danh sách buổi' });
+    if (['ADMIN', 'TEACHER', 'ASSISTANT'].includes(profile.role) && pendingEvaluationCount > 0) tasks.push({ code: 'EVALUATION_PENDING', count: pendingEvaluationCount, severity: 'INFO', label: 'Buổi học chưa đánh giá', route: '/attendance', actionLabel: 'Mở danh sách đánh giá' });
+    const missingLedgerCount = ['ADMIN', 'ACCOUNTANT'].includes(profile.role) ? activeEnrollments.filter((item: any) => !ledgerIds.has(item.id)).length : 0;
+    if (missingLedgerCount > 0) tasks.push({ code: 'TUITION_LEDGER_PENDING', count: missingLedgerCount, severity: 'WARNING', label: 'Enrollment chưa có ledger', route: '/finance/tuition', actionLabel: 'Kiểm tra học phí' });
+    if (['ADMIN', 'ACCOUNTANT'].includes(profile.role) && (!payroll.data || payroll.data.status !== 'APPROVED')) tasks.push({ code: 'PAYROLL_PENDING_APPROVAL', count: 1, severity: 'BLOCKED', label: 'Payroll chưa được duyệt', route: '/payroll', actionLabel: 'Mở payroll' });
+    if (alerts.length > 0 && ['ADMIN', 'ACCOUNTANT'].includes(profile.role)) tasks.push({ code: 'INTEGRITY_WARNING', count: alerts.length, severity: 'WARNING', label: 'Cảnh báo cần kiểm tra', route: '/periods', actionLabel: 'Kiểm tra dữ liệu' });
+    const upcomingSessions = sessionStates.filter((session) => session.session_date >= today).slice(0, 5).map((session) => ({
+      id: session.id,
+      class_id: session.class_id,
+      class_code: session.class?.code ?? '',
+      class_name: session.class?.name ?? '',
+      session_date: session.session_date,
+      start_time: session.start_time,
+      status: session.status,
+      attendance_marked: session.attendanceMarked,
+      evaluation_marked: session.evaluationMarked,
+    }));
     return finish(request, ok({ period, activeClasses: classes.count ?? 0, activeStudents: students.count ?? 0,
       totalDue, totalPaid, totalDebt, payrollTotal, otherIncome, otherExpense, rewards, profitBeforeFund,
-      fundContribution, distributableProfit, alerts, role: profile.role }, traceId));
+      fundContribution, distributableProfit, alerts, role: profile.role, tasks, upcomingSessions }, traceId));
   } catch (error) { return errorResponse(error, request, traceId); }
 }) };

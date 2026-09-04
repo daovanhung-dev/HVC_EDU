@@ -30,6 +30,7 @@ export const routes: Routes = [
       { path: 'staff/:id', data: { roles: finance }, canActivate: [roleGuard], loadComponent: () => import('./features/staff/staff-detail.component').then((m) => m.StaffDetailComponent) },
       { path: 'assignments', data: { roles: admin }, canActivate: [roleGuard], loadComponent: () => import('./features/staff/assignments.component').then((m) => m.AssignmentsComponent) },
       { path: 'finance/tuition', data: { roles: finance }, canActivate: [roleGuard], loadComponent: () => import('./features/finance/tuition.component').then((m) => m.TuitionComponent) },
+      { path: 'finance', data: { roles: finance }, canActivate: [roleGuard], loadComponent: () => import('./features/finance/finance.component').then((m) => m.FinanceComponent) },
       { path: 'finance/tuition/:classId', data: { roles: finance }, canActivate: [roleGuard], loadComponent: () => import('./features/finance/tuition-class.component').then((m) => m.TuitionClassComponent) },
       { path: 'finance/payments/new', data: { roles: finance }, canActivate: [roleGuard], loadComponent: () => import('./features/finance/payment-form.component').then((m) => m.PaymentFormComponent) },
       { path: 'finance/debts', data: { roles: finance }, canActivate: [roleGuard], loadComponent: () => import('./features/finance/debts.component').then((m) => m.DebtsComponent) },
