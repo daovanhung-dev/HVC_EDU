@@ -35,3 +35,6 @@ verify_jwt = true
 
 [functions.attendance-bulk-upsert]
 verify_jwt = true
+
+[functions.invite-staff-account]
+verify_jwt = true

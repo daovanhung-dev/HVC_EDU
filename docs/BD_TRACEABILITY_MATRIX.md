@@ -9,10 +9,10 @@ Status values describe repository evidence. `IMPLEMENTED` means code and static/
 | ACT-03 | Actor | Teacher | attendance/evaluation routes, assignment RLS | build; Deno check | IMPLEMENTED |
 | ACT-04 | Actor | Teaching assistant | attendance/evaluation routes, assignment RLS | build; Deno check | IMPLEMENTED |
 | DQ-01 | Data quality | Roster 50 vs ledger 48 | `data-integrity-check`, migration docs | runtime DB smoke pending | IMPLEMENTED |
-| DQ-02 | Data quality | Reject `#REF!` carry-over | `import-center-workbook` | Deno check | IMPLEMENTED |
+| DQ-02 | Data quality | Ignore and record `#REF!` cells without converting to zero | `import-center-workbook` | Deno check; runtime workbook validation | IMPLEMENTED |
 | DQ-03 | Data quality | Required finance metadata | `record-financial-transaction`, integrity check | Deno check | IMPLEMENTED |
 | DQ-04 | Data quality | Payroll policy/default mismatch | `calculate-payroll`, `payroll_policies` seed | Deno check | IMPLEMENTED |
-| DQ-05 | Data quality | Excel date/session parsing | import validator, integer schema checks | runtime workbook pending | PARTIAL |
+| DQ-05 | Data quality | Excel date/session parsing | import validator, integer schema checks | remote workbook import smoke | IMPLEMENTED |
 | TBL-01 | Table | centers | `202609040001_initial_schema.sql` | DB reset pending | IMPLEMENTED |
 | TBL-02 | Table | profiles | `202609040001_initial_schema.sql`, role RPC | DB reset pending | IMPLEMENTED |
 | TBL-03 | Table | accounting_periods | initial schema, period RPC | DB reset pending | IMPLEMENTED |
@@ -72,7 +72,7 @@ Status values describe repository evidence. `IMPLEMENTED` means code and static/
 | UC-17 | Use case | Close period | preview/close RPC | Deno check; DB pending | IMPLEMENTED |
 | UC-18 | Use case | Settings | settings/profile role screen/RPC | npm build; Deno check | IMPLEMENTED |
 | UC-19 | Use case | Audit | audit screen/RLS | npm build | IMPLEMENTED |
-| UC-20 | Use case | Excel import | migration/upload/validation | Deno check; workbook pending | PARTIAL |
+| UC-20 | Use case | Excel import | migration/upload/validation | Deno check; remote import job | IMPLEMENTED |
 | AC-01 | Acceptance flow | Monthly operation | period → sessions → attendance → tuition → payroll → close | manual/runtime pending | IMPLEMENTED |
 | AC-02 | Acceptance flow | Attendance/evaluation | roster → C/N/P → evaluation → bulk save | npm build; Deno check | IMPLEMENTED |
 | AC-03 | Acceptance flow | Tuition | preview → snapshot → payment/debt | Deno check; DB pending | IMPLEMENTED |
@@ -113,7 +113,7 @@ Status values describe repository evidence. `IMPLEMENTED` means code and static/
 | EF-12 | Edge Function | Close preview | `close-period-preview` | Deno check | IMPLEMENTED |
 | EF-13 | Edge Function | Close period | `close-period` | Deno check | IMPLEMENTED |
 | EF-14 | Edge Function | Integrity check | `data-integrity-check` | Deno check | IMPLEMENTED |
-| EF-15 | Edge Function | Excel import | `import-center-workbook` | Deno check; workbook pending | PARTIAL |
+| EF-15 | Edge Function | Excel import | `import-center-workbook` | Deno check; remote import job | IMPLEMENTED |
 | EF-16 | Edge Function | Tuition summary gap closure | `tuition-summary` | Deno check | IMPLEMENTED |
 | EF-17 | Edge Function | Void payment gap closure | `void-payment` | Deno check | IMPLEMENTED |
 | SCR-01 | Screen | Login | `/login` | npm build | IMPLEMENTED |
@@ -145,3 +145,7 @@ Status values describe repository evidence. `IMPLEMENTED` means code and static/
 | SCR-27 | Screen | Settings | `/settings` | npm build | IMPLEMENTED |
 | SCR-28 | Screen | Audit | `/audit` | npm build | IMPLEMENTED |
 | SCR-29 | Screen | Migration | `/migration` | npm build | IMPLEMENTED |
+| FIX-01 | Fixbug | Class edit: validation, duplicate code, audit, inactive history preservation | `rpc_update_class`, `class-detail.component.ts`, migration `202609040012` | Angular build; remote migration | IMPLEMENTED |
+| FIX-02 | Fixbug | Enrollment ACTIVE/LEFT, required end date, terminal re-entry and audit | `rpc_update_enrollment_status`, `rpc_create_enrollment`, class/student detail | Angular build; remote migration | IMPLEMENTED |
+| FIX-03 | Fixbug | Payroll breakdown with names and role-based money visibility | `payroll.component.ts`, `class-detail.component.ts`, `payroll_items` reads | Angular build; Deno check | IMPLEMENTED |
+| FIX-04 | Fixbug | Admin staff account invite, email uniqueness, rollback and inactive lock | `invite-staff-account`, `rpc_link_staff_account`, `rpc_update_staff`, migrations `202609040012–016` | Deno check; remote deploy | IMPLEMENTED |

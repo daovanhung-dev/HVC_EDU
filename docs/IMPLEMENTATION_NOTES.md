@@ -11,6 +11,11 @@
 - Class, student and staff edit/deactivate flows use audited admin-only RPCs; deactivating a student closes active enrollments with history preserved.
 - Tuition preview, debt adjustments/carry-over, payment void and data-integrity checks are wired to their screens.
 - Role changes use `update-profile-role` → `rpc_update_profile_role` and include before/after audit data.
+- Fixbug package: class edits validate grade/fee and duplicate code with full before/after audit; historical tuition ledgers remain unchanged.
+- Enrollment status changes use audited `rpc_update_enrollment_status`; `LEFT` requires an end date and is terminal. Re-entry uses audited `rpc_create_enrollment` and a new row.
+- Payroll UI is read-only and hydrates staff/class names from `payroll_items`; money is shown only to Admin/Accountant, while teaching roles retain assignment names without amounts.
+- Staff accounts use `staff.email`, a center-scoped unique lower-case index, Admin-only `invite-staff-account`, rollback of a newly invited Auth user on link failure, and one-way profile locking when staff becomes inactive.
+- Direct browser writes for classes, students, staff and enrollments are revoked; their current create/update flows use audited RPCs, preventing bypass of validation, history retention and terminal `LEFT` enrollment rules.
 
 ## Known environment limitation
 
@@ -18,7 +23,7 @@ The current runner has the Supabase CLI and Deno but no Docker/Podman, so migrat
 
 ## Known source-data limitation
 
-The project does not contain the operational workbook. The migration function validates the uploaded workbook server-side, stores it in a private bucket, records sheet samples/issues and blocks `#REF!`; source-specific normalization/reconciliation must be verified against the real workbook before production import. It deliberately does not convert formula errors to zero.
+The supplied operational workbook is validated server-side, stored in the private import bucket, and imported through the normalized workbook RPC. It maps classes/schedules, staff/assignments, students/enrollments, sessions, C/N attendance, comments as evaluations, tuition snapshots/payments, carry-over/opening-debt adjustments, expenses, payroll, fund ledger and profit distributions. Formula/report/instruction sheets remain preserved in the private source file and reconciliation summary rather than being duplicated into business tables. `#REF!` cells are recorded as warnings and ignored per the import decision; they are never converted to zero. The August 2026 source still has two L09 roster students without accounting rows, 153 blank attendance cells, and two expense rows with missing date/category/description; these are retained as explicit warnings and are not fabricated.
 
 ## Decisions
 

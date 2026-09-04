@@ -82,7 +82,7 @@ Các function hiện có:
 - `tuition-preview`, `generate-tuition`, `tuition-summary`
 - `record-payment`, `void-payment`, `create-tuition-adjustment`, `carry-over-period`
 - `calculate-payroll`, `approve-payroll`, `close-period-preview`, `close-period`
-- `data-integrity-check`, `import-center-workbook`, `update-profile-role`
+- `data-integrity-check`, `import-center-workbook`, `update-profile-role`, `invite-staff-account`
 
 Các nghiệp vụ tài chính, payroll, đóng kỳ và thay đổi quyền đều đi qua Edge Function → RPC transaction → audit log.
 

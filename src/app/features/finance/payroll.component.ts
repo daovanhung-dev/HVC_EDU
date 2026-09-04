@@ -1,10 +1,83 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { EdgeFunctionService } from '../../core/api/edge-function.service';
+import { AuthService } from '../../core/auth/auth.service';
 import { PeriodContextService } from '../../core/services/period-context.service';
 import { SupabaseService } from '../../core/supabase/supabase.service';
 import { ToastService } from '../../core/services/toast.service';
 import { formatMoney } from '../../core/utils/money.util';
-@Component({selector:'app-payroll',standalone:true,template:`
-<section class="page-header"><div><p class="eyebrow">NHÂN SỰ</p><h1>Payroll</h1><p class="muted">Policy, cap và rounding được tính server-side.</p></div><div><button class="secondary" (click)="calculate(true)">Preview</button><button class="primary" (click)="calculate(false)">Lưu DRAFT</button></div></section>@if(error()){<div class="alert">{{error()}}</div>}<section class="card section-card"><div class="stat-list"><div><span>Tổng lương</span><strong>{{money(total())}}</strong></div><div><span>Policy</span><strong>{{policy()?.teacher_percent*100||25}}% GV · {{policy()?.assistant_percent*100||15}}% TG · cap {{policy()?.max_total_percent*100||40}}%</strong></div></div></section><div class="card table-wrap"><table><thead><tr><th>Nhân sự</th><th>Lớp</th><th>Vai trò</th><th>Doanh thu</th><th>%</th><th>Cơ bản đã làm tròn</th><th>Thực nhận</th></tr></thead><tbody>@for(i of items();track i.staff_id+i.class_id+i.role){<tr><td>{{i.staff_id}}</td><td>{{i.class_id}}</td><td>{{i.role}}</td><td>{{money(i.class_revenue)}}</td><td>{{(i.applied_percent*100).toFixed(2)}}%</td><td>{{money(i.base_amount)}}</td><td>{{money(i.final_amount)}}</td></tr>}@empty{<tr><td colspan="7" class="empty">Chưa có dữ liệu payroll.</td></tr>}</tbody></table></div>@if(runId()){<section class="card section-card"><p>Run: {{runId()}}</p><button class="primary" (click)="approve()">Duyệt payroll (Admin)</button></section>}
-`})
-export class PayrollComponent implements OnInit{items=signal<any[]>([]);policy=signal<any>(null);total=signal(0);runId=signal('');error=signal('');constructor(private readonly edge:EdgeFunctionService,readonly period:PeriodContextService,private readonly supabase:SupabaseService,private readonly toast:ToastService){}ngOnInit(){void this.loadRun();}async loadRun(){const p=this.period.current();if(!p)return;const r=await this.supabase.client.from('payroll_runs').select('id,status,total_amount').eq('period_id',p.id).maybeSingle();if(!r.error&&r.data){this.runId.set(r.data.id);this.total.set(Number(r.data.total_amount||0));const i=await this.supabase.client.from('payroll_items').select('*').eq('payroll_run_id',r.data.id);if(!i.error)this.items.set(i.data||[]);}}async calculate(dryRun:boolean){const p=this.period.current();if(!p)return;try{const result=await this.edge.invoke<any>('calculate-payroll',{period_id:p.id,dry_run:dryRun});this.items.set(result.items||[]);this.total.set(Number(result.total_amount||0));this.policy.set(result.policy);if(!dryRun){this.runId.set(result.payroll_run_id);this.toast.success('Đã lưu payroll DRAFT.');}}catch(e){this.error.set(e instanceof Error?e.message:'Không thể tính payroll.');}}async approve(){try{await this.edge.invoke('approve-payroll',{payroll_run_id:this.runId()});this.toast.success('Đã duyệt payroll.');}catch(e){this.error.set(e instanceof Error?e.message:'Không thể duyệt payroll.');}}money(v:unknown){return formatMoney(Number(v||0));}}
+
+@Component({
+  selector: 'app-payroll',
+  standalone: true,
+  template: `
+    <section class="page-header"><div><p class="eyebrow">NHÂN SỰ</p><h1>Payroll</h1><p class="muted">Policy, cap và rounding được tính server-side.</p></div><div><button class="secondary" (click)="calculate(true)">Preview</button><button class="primary" (click)="calculate(false)">Lưu DRAFT</button></div></section>
+    @if(error()){<div class="alert">{{error()}}</div>}
+    <section class="card section-card"><div class="stat-list"><div><span>Tổng lương</span><strong>{{money(total())}}</strong></div><div><span>Policy</span><strong>{{policy()?.teacher_percent*100||25}}% GV · {{policy()?.assistant_percent*100||15}}% TG · cap {{policy()?.max_total_percent*100||40}}%</strong></div></div></section>
+    <div class="card table-wrap"><table><thead><tr><th>Nhân sự</th><th>Mã NS</th><th>Lớp</th><th>Mã lớp</th><th>Vai trò</th><th>Doanh thu</th><th>Tỷ lệ</th><th>Lương cơ bản</th><th>Thưởng</th><th>Phạt</th><th>Thực nhận</th></tr></thead><tbody>@for(i of items();track i.staff_id+i.class_id+i.role){<tr><td>{{i.staff?.full_name||i.staff_id}}</td><td>{{i.staff?.code||'—'}}</td><td>{{i.class?.name||i.class_id}}</td><td>{{i.class?.code||'—'}}</td><td>{{roleLabel(i.role)}}</td><td>{{money(i.class_revenue)}}</td><td>{{percent(i.applied_percent)}}%</td><td>{{money(i.base_amount)}}</td><td>{{money(i.bonus)}}</td><td>{{money(i.penalty)}}</td><td><strong>{{money(i.final_amount)}}</strong></td></tr>}@empty{<tr><td colspan="11" class="empty">Chưa có dữ liệu payroll.</td></tr>}</tbody></table></div>
+    @if(runId()){<section class="card section-card"><p>Run: {{runId()}}</p>@if(auth.role()==='ADMIN'){<button class="primary" (click)="approve()">Duyệt payroll (Admin)</button>}</section>}
+  `,
+})
+export class PayrollComponent implements OnInit {
+  items = signal<any[]>([]);
+  policy = signal<any>(null);
+  total = signal(0);
+  runId = signal('');
+  error = signal('');
+
+  constructor(private readonly edge: EdgeFunctionService, readonly period: PeriodContextService, private readonly supabase: SupabaseService, private readonly toast: ToastService, readonly auth: AuthService) {}
+
+  ngOnInit() { void this.loadRun(); }
+
+  async loadRun() {
+    await this.period.ready;
+    const current = this.period.current();
+    if (!current) return;
+    const policy = await this.supabase.client.from('payroll_policies').select('id,name,teacher_percent,assistant_percent,max_total_percent,rounding_step').lte('effective_from', current.start_date).or(`effective_to.is.null,effective_to.gte.${current.start_date}`).eq('active', true).order('effective_from', { ascending: false }).limit(1).maybeSingle();
+    if (!policy.error) this.policy.set(policy.data);
+    const run = await this.supabase.client.from('payroll_runs').select('id,status,total_amount').eq('period_id', current.id).maybeSingle();
+    if (run.error) { this.error.set(run.error.message); return; }
+    if (!run.data) { this.runId.set(''); this.items.set([]); this.total.set(0); return; }
+    this.runId.set(run.data.id);
+    this.total.set(Number(run.data.total_amount || 0));
+    const rows = await this.supabase.client.from('payroll_items').select('id,staff_id,class_id,role,class_revenue,applied_percent,base_amount,bonus,penalty,final_amount').eq('payroll_run_id', run.data.id);
+    if (rows.error) this.error.set(rows.error.message); else this.items.set(await this.decorate(rows.data || []));
+  }
+
+  async calculate(dryRun: boolean) {
+    const current = this.period.current();
+    if (!current) { this.error.set('Chưa chọn kỳ kế toán.'); return; }
+    this.error.set('');
+    try {
+      const result = await this.edge.invoke<any>('calculate-payroll', { period_id: current.id, dry_run: dryRun });
+      this.items.set(await this.decorate(result.items || []));
+      this.total.set(Number(result.total_amount || 0));
+      this.policy.set(result.policy);
+      if (!dryRun) { this.runId.set(result.payroll_run_id); this.toast.success('Đã lưu payroll DRAFT.'); }
+    } catch (e) { this.error.set(e instanceof Error ? e.message : 'Không thể tính payroll.'); }
+  }
+
+  async approve() {
+    if (!this.runId()) return;
+    try { await this.edge.invoke('approve-payroll', { payroll_run_id: this.runId() }); this.toast.success('Đã duyệt payroll.'); await this.loadRun(); }
+    catch (e) { this.error.set(e instanceof Error ? e.message : 'Không thể duyệt payroll.'); }
+  }
+
+  private async decorate(items: any[]) {
+    const staffIds = [...new Set(items.map((item) => item.staff_id).filter(Boolean))];
+    const classIds = [...new Set(items.map((item) => item.class_id).filter(Boolean))];
+    if (!staffIds.length && !classIds.length) return items;
+    const [staffResult, classResult] = await Promise.all([
+      staffIds.length ? this.supabase.client.from('staff').select('id,code,full_name').in('id', staffIds) : Promise.resolve({ data: [], error: null } as any),
+      classIds.length ? this.supabase.client.from('classes').select('id,code,name').in('id', classIds) : Promise.resolve({ data: [], error: null } as any),
+    ]);
+    if (staffResult.error) this.error.set(staffResult.error.message);
+    if (classResult.error) this.error.set(classResult.error.message);
+    const staffMap = new Map((staffResult.data || []).map((row: any) => [row.id, row]));
+    const classMap = new Map((classResult.data || []).map((row: any) => [row.id, row]));
+    return items.map((item) => ({ ...item, staff: item.staff || staffMap.get(item.staff_id), class: item.class || classMap.get(item.class_id) }));
+  }
+
+  roleLabel(role: string) { return role === 'MAIN_TEACHER' ? 'Giáo viên chính' : 'Trợ giảng'; }
+  percent(value: unknown) { return (Number(value || 0) * 100).toFixed(2); }
+  money(v: unknown) { return formatMoney(Number(v || 0)); }
+}

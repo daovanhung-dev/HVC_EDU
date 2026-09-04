@@ -19,11 +19,11 @@ Files: `supabase/migrations/202609040001_initial_schema.sql` through `2026090400
 
 Tests: `deno check --no-config --node-modules-dir=auto supabase/functions/_shared/*.ts supabase/functions/*/index.ts` PASS.
 
-## STEP 11 — Supabase local validation
+## STEP 11 — Supabase local validation and remote runtime
 
-Status: BLOCKED BY ENVIRONMENT
+Status: LOCAL BLOCKED BY ENVIRONMENT; REMOTE APPLIED
 
-`supabase db reset`, local lint and generated type refresh require Docker/Podman. The installed CLI reports that neither Docker nor Podman is available in this environment. No remote project URL/key/password was supplied, so no remote migration or function deploy was attempted.
+`supabase db reset`, local lint and generated type refresh require Docker/Podman. The installed CLI reports that neither Docker nor Podman is available in this environment. The configured remote project has migrations through `202609040011` applied and the import function deployed; the remote workbook import and integrity smoke checks completed.
 
 ## STEP 12–30 — Auth, shell, period, education, finance, payroll, reports, settings, audit, migration
 
@@ -62,12 +62,23 @@ Status: DONE for local build gates
 
 ## STEP 36 — Supabase deployment readiness
 
-Status: READY, deployment not performed
+Status: REMOTE DEPLOYED; CI deployment remains available
 
-The workflow uses GitHub Secrets for access token/database password and a repository variable for project ref. Frontend constants contain placeholders until the owner supplies the public project URL/key.
+The workflow uses GitHub Secrets for access token/database password and a repository variable for project ref. The configured remote project is deployed from this workspace; frontend constants contain the public project URL/publishable key only.
 
 ## STEP 37 — BD reconciliation
 
-Status: PARTIAL / AWAITING SOURCE WORKBOOK
+Status: DONE WITH SOURCE WARNINGS
 
-Reference seed covers the four classes, five staff records, August/September 2026 periods and 25/15/40% payroll policy. No `.xlsx`/`.xls` source file exists in the workspace, so the 50-vs-48 roster/ledger and August financial totals cannot be reconciled without inventing data. The migration validator is prepared to report those source-specific issues once the workbook is supplied.
+The source workbook `docs/excels/TrungTam_HungCuong_T8 (1).xlsx` was imported into the remote center for August 2026. Reconciled totals are: tuition due/paid 14,485,000 VND, payroll 5,794,000 VND, other expenses 6,270,898 VND, fund contribution 242,010 VND and distributable profit 2,178,092 VND. Runtime warnings preserve the source discrepancies: two L09 roster students have no accounting rows, 153 attendance cells are blank, two expense rows use explicit fallback metadata, and nine `#REF!` cells are ignored.
+
+## STEP 38 — Fixbug implementation
+
+Status: IMPLEMENTED; remote migrations and invite function deployed
+
+- Class detail now edits class master fields with integer-VND/grade validation, duplicate-code handling and inactive status preservation.
+- Student/class roster and student history can end an active enrollment with a required end date; ended enrollments cannot be reopened, and the student detail can create a new enrollment for re-entry.
+- Payroll shows staff/class names and read-only revenue, rate, base, bonus, penalty and final amount breakdown. Amounts remain restricted to Admin/Accountant.
+- Staff list/detail show email/account state and expose the invite action only to Admin. `invite-staff-account` links the invited Auth user through an audited RPC and removes the new Auth user if linking fails.
+- Remote: migrations `202609040012_staff_accounts_enrollment.sql` through `202609040016_enrollment_reentry_guard.sql` applied; `invite-staff-account` deployed.
+- Verification: Angular tests 3 files/4 tests PASS; Angular production build PASS; Deno function check PASS; Supabase migration dry-run and remote apply PASS. A real invite delivery test remains intentionally unsent until an approved test recipient is provided.
