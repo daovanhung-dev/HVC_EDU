@@ -1,0 +1,47 @@
+name: Deploy Angular to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.22.3'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build Angular
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: npm run build:pages -- --base-href "/${REPO_NAME}/"
+      - name: SPA fallback for GitHub Pages
+        run: cp dist/hungcuong-center-management/index.html dist/hungcuong-center-management/404.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist/hungcuong-center-management
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

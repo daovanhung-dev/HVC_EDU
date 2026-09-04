@@ -1,0 +1,9 @@
+/node_modules
+/dist
+/.angular
+/.supabase
+.env
+.env.local
+.DS_Store
+*.log
+src/app/core/supabase/database.types.ts

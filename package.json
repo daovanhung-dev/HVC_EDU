@@ -1,0 +1,42 @@
+{
+  "name": "hungcuong-center-management",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "build:pages": "ng build --configuration production",
+    "test": "ng test --watch=false --no-progress",
+    "supabase:init": "supabase init",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status",
+    "supabase:reset": "supabase db reset",
+    "supabase:types": "supabase gen types typescript --local > src/app/core/supabase/database.types.ts",
+    "functions:serve": "supabase functions serve",
+    "functions:deploy": "supabase functions deploy --use-api"
+  },
+  "dependencies": {
+    "@angular/common": "^22.1.0",
+    "@angular/compiler": "^22.1.0",
+    "@angular/core": "^22.1.0",
+    "@angular/forms": "^22.1.0",
+    "@angular/platform-browser": "^22.1.0",
+    "@angular/router": "^22.1.0",
+    "@supabase/supabase-js": "2.112.2",
+    "rxjs": "~7.8.2",
+    "tslib": "^2.8.1",
+    "zone.js": "~0.16.2"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.1.6",
+    "@angular/cli": "^22.1.6",
+    "@angular/compiler-cli": "^22.1.0",
+    "supabase": "2.116.0",
+    "typescript": "~6.0.3"
+  },
+  "engines": {
+    "node": ">=22.22.3"
+  }
+}
