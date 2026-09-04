@@ -11,7 +11,7 @@ export function withCors(response: Response, request: Request): Response {
   const allowed = new Set([
     'http://localhost:4200',
     'http://127.0.0.1:4200',
-    'https://daovanhung.github.io',
+    'https://daovanhung-dev.github.io',
   ]);
   const headers = new Headers(response.headers);
   if (allowed.has(origin)) {

@@ -3,6 +3,6 @@
  * password, or CI access tokens in this file.
  */
 export const SUPABASE_CONFIG = {
-  url: 'https://YOUR_PROJECT_REF.supabase.co',
-  publishableKey: 'sb_publishable_YOUR_PUBLIC_KEY',
+  url: 'https://ytixnjosaruvpnlvkesv.supabase.co',
+  publishableKey: 'sb_publishable_-yKPOJfcRaUs9binFQRN_w_WQxM4j6G',
 } as const;

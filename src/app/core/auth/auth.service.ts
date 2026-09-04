@@ -58,7 +58,13 @@ export class AuthService {
   }
 
   async resetPassword(email: string): Promise<void> {
-    const { error } = await this.supabase.client.auth.resetPasswordForEmail(email);
+    const redirectTo = new URL('reset-password', document.baseURI).toString();
+    const { error } = await this.supabase.client.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) throw error;
+  }
+
+  async updatePassword(password: string): Promise<void> {
+    const { error } = await this.supabase.client.auth.updateUser({ password });
     if (error) throw error;
   }
 }

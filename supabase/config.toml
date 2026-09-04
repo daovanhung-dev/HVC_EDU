@@ -1,4 +1,4 @@
-project_id = "hungcuong-center-management"
+project_id = "ytixnjosaruvpnlvkesv"
 
 [api]
 enabled = true
@@ -18,8 +18,12 @@ api_url = "http://127.0.0.1"
 
 [auth]
 enabled = true
-site_url = "http://localhost:4200"
-additional_redirect_urls = ["http://localhost:4200/**"]
+site_url = "https://daovanhung-dev.github.io/HVC_EDU/"
+additional_redirect_urls = [
+  "https://daovanhung-dev.github.io/HVC_EDU/**",
+  "http://localhost:4200/**",
+  "http://127.0.0.1:4200/**"
+]
 jwt_expiry = 3600
 enable_signup = false
 

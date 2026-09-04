@@ -10,6 +10,7 @@ const teaching = ['ADMIN','TEACHER','ASSISTANT'];
 
 export const routes: Routes = [
   { path: 'login', canActivate: [guestGuard], loadComponent: () => import('./features/auth/login.component').then((m) => m.LoginComponent) },
+  { path: 'reset-password', loadComponent: () => import('./features/auth/reset-password.component').then((m) => m.ResetPasswordComponent) },
   {
     path: '', canActivate: [authGuard], loadComponent: () => import('./layout/app-shell.component').then((m) => m.AppShellComponent),
     children: [

@@ -24,6 +24,8 @@ jobs:
           node-version: '22.22.3'
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
+      - name: Test
+        run: npm test
       - name: Build Angular
         env:
           REPO_NAME: ${{ github.event.repository.name }}

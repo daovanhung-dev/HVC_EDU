@@ -159,7 +159,7 @@ supabase/
 - CRUD đọc đơn giản: Angular → Supabase Data API → RLS.
 - Nghiệp vụ tiền/lương/đóng tháng: Angular → Edge Function → DB.
 - Không hard-code role/tỷ lệ lương trong FE.
-- Không dùng `service_role`/secret key trong browser.
+- Không dùng service-role/secret key trong browser.
 - Không xóa cứng payment/payroll/audit.
 - Mọi logic tài chính quan trọng phải idempotent + transaction + audit.
 - Không dùng `.env`/`environment.ts` cho cấu hình Supabase frontend.
