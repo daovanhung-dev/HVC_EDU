@@ -218,7 +218,7 @@ begin
     if not found then
       insert into public.tuition_ledgers(period_id,enrollment_id,attended_sessions,absent_sessions,billable_sessions,unit_price,gross_amount,opening_debt,adjustment_amount,amount_due,paid_amount,debt_amount,status)
       values (p_period_id,v_enrollment.id,v_present,v_absent,v_billable,v_unit,v_gross,v_opening,v_positive-v_discount,v_due,v_paid,greatest(0,v_due-v_paid),
-        case when v_paid >= v_due then 'PAID' when v_paid > 0 then 'PARTIAL' else 'CONFIRMED' end);
+        (case when v_paid >= v_due then 'PAID' when v_paid > 0 then 'PARTIAL' else 'CONFIRMED' end)::public.ledger_status);
       v_created := v_created + 1;
     elsif v_ledger.status='DRAFT' then
       update public.tuition_ledgers set attended_sessions=v_present,absent_sessions=v_absent,billable_sessions=v_billable,
@@ -274,7 +274,7 @@ begin
   values (p_ledger_id,p_amount,p_paid_at,p_method,p_reference,p_note,v_user) returning id into v_payment_id;
   v_paid := v_paid + p_amount;
   update public.tuition_ledgers set paid_amount=v_paid,debt_amount=greatest(0,amount_due-v_paid),
-    status=case when v_paid >= amount_due then 'PAID' when v_paid > 0 then 'PARTIAL' else 'UNPAID' end,updated_at=now()
+    status=(case when v_paid >= amount_due then 'PAID' when v_paid > 0 then 'PARTIAL' else 'UNPAID' end)::public.ledger_status,updated_at=now()
   where id=p_ledger_id;
   insert into public.audit_logs(center_id,actor_user_id,action,resource_type,resource_id,after_data,trace_id)
   values (public.current_center_id(),v_user,'PAYMENT_CREATED','payment',v_payment_id::text,
@@ -309,7 +309,7 @@ begin
   update public.payments set voided_at=now(),voided_by=v_user,note=concat_ws(' | ',note,'VOID: '||p_reason) where id=p_payment_id;
   select coalesce(sum(amount) filter (where voided_at is null),0) into v_paid from public.payments where tuition_ledger_id=v_payment.tuition_ledger_id;
   update public.tuition_ledgers set paid_amount=v_paid,debt_amount=greatest(0,amount_due-v_paid),
-    status=case when v_paid >= amount_due then 'PAID' when v_paid > 0 then 'PARTIAL' else 'UNPAID' end,updated_at=now()
+    status=(case when v_paid >= amount_due then 'PAID' when v_paid > 0 then 'PARTIAL' else 'UNPAID' end)::public.ledger_status,updated_at=now()
   where id=v_payment.tuition_ledger_id;
   insert into public.audit_logs(center_id,actor_user_id,action,resource_type,resource_id,after_data,trace_id)
   values (public.current_center_id(),v_user,'PAYMENT_VOIDED','payment',p_payment_id::text,
@@ -460,7 +460,7 @@ begin
         and a.start_date <= v_period.end_date
         and (a.end_date is null or a.end_date >= v_period.start_date)
     ) then raise exception using message='CLASS_NOT_ASSIGNED'; end if;
-    if v_item.applied_percent <> case when v_item.role='ASSISTANT' then v_policy.assistant_percent else v_policy.teacher_percent end then
+    if v_item.applied_percent <> (case when v_item.role='ASSISTANT' then v_policy.assistant_percent else v_policy.teacher_percent end) then
       raise exception using message='VALIDATION_ERROR';
     end if;
     if v_item.final_amount > floor(v_item.class_revenue * v_policy.max_total_percent) then
