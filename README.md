@@ -1,193 +1,73 @@
-# Hùng Cường Center Management
+# HVC EDU · Quản lý trung tâm tối giản
 
-Init project cho hệ thống quản lý trung tâm Hùng Cường theo BD trong `docs/BD_HeThong_QuanLy_TrungTam_HungCuong.md`.
+Hệ thống Angular standalone + Supabase cho bốn việc chính: quản lý lớp và học sinh, lịch/buổi học, điểm danh–nhận xét, nhân sự–chấm công và sổ thu chi.
 
-## Stack
+## Phạm vi
 
-- Angular 22.x, standalone components.
-- Supabase Auth + PostgreSQL + RLS + Data API.
-- Supabase Edge Functions (TypeScript/Deno, `@supabase/server@^1`).
-- GitHub Pages cho Angular SPA.
-- GitHub Actions cho FE và Supabase.
+- Admin: dashboard, CRUD lớp/học sinh/nhân sự, phân công, sinh buổi theo khoảng ngày, điểm danh, nhận xét, chấm công và thu chi.
+- Staff: dashboard giới hạn, lớp được phân công, roster/lịch/buổi học, điểm danh, nhận xét và tự chấm công.
+- Dữ liệu tiền là `bigint` VND. Dữ liệu lịch sử được giữ; thao tác xóa master data chuyển sang `INACTIVE`.
+- Không có kỳ tháng, học phí, payment/công nợ, payroll, carry-over, quỹ/lợi nhuận, import, thông báo hoặc màn hình audit.
 
-## Yêu cầu môi trường
+## Chạy frontend
 
-- Node.js **>= 22.22.3**.
-- npm.
-- Docker nếu muốn chạy toàn bộ Supabase local (`supabase start`).
-
-## 1. Cài dependencies
-
-```bash
-npm install
-```
-
-## 2. Chạy Supabase local
-
-```bash
-npx supabase start
-npx supabase db reset
-npx supabase status
-```
-
-Lấy `API URL` và **publishable key** từ `supabase status`, sau đó cập nhật
-`src/app/core/config/supabase.constants.ts` (chỉ đặt public/publishable key), rồi:
-
-```bash
-npm start
-```
-
-Angular chạy tại `http://localhost:4200`.
-
-## 3. Tạo tài khoản Admin đầu tiên
-
-1. Vào Supabase Studio/Auth và tạo user (signup đang tắt trong local config).
-2. Copy UUID user.
-3. Chạy SQL sau trong SQL Editor:
-
-```sql
-insert into public.profiles(user_id, center_id, full_name, role, active)
-select
-  'USER_UUID'::uuid,
-  c.id,
-  'Đào Văn Hùng',
-  'ADMIN'::public.app_role,
-  true
-from public.centers c
-where c.code = 'HC';
-```
-
-Sau đó đăng nhập trên `/login`.
-
-## 4. Edge Functions
-
-Serve local:
-
-```bash
-npx supabase functions serve
-```
-
-Health check:
-
-```bash
-curl http://127.0.0.1:54321/functions/v1/health
-```
-
-Các function hiện có:
-
-- `health`
-- `dashboard-summary`
-- `attendance-bulk-upsert`
-- `generate-month-sessions`, `evaluation-bulk-upsert`
-- `tuition-preview`, `generate-tuition`, `tuition-summary`
-- `record-payment`, `void-payment`, `create-tuition-adjustment`, `carry-over-period`
-- `calculate-payroll`, `approve-payroll`, `close-period-preview`, `close-period`
-- `data-integrity-check`, `import-center-workbook`, `update-profile-role`, `invite-staff-account`
-
-Các nghiệp vụ tài chính, payroll, đóng kỳ và thay đổi quyền đều đi qua Edge Function → RPC transaction → audit log.
-
-## 5. Generate DB types
-
-Sau khi migration ổn định:
-
-```bash
-npm run supabase:types
-```
-
-> Khi có Supabase local, chạy lệnh trên để refresh type contract theo migration. Workspace hiện giữ một contract tối thiểu để frontend vẫn biên dịch khi Docker chưa có.
-
-## 6. Deploy GitHub Pages
-
-Repository Settings → Pages → Source = **GitHub Actions**.
-
-Publishable key được phép xuất hiện ở browser trong file constants; **không đặt
-secret/service key vào Angular**.
-
-Push `main` sẽ chạy `.github/workflows/deploy-pages.yml`.
-
-Workflow tự:
-
-1. Build Angular với `base-href /<repo>/`.
-2. Tạo `404.html` fallback cho SPA route.
-3. Deploy Pages.
-
-Nếu dùng custom domain ở root, đổi `--base-href` thành `/`.
-
-## 7. Deploy Supabase
-
-Tạo GitHub Repository Variable/Secrets:
-
-Variables:
-- `SUPABASE_PROJECT_REF` (tùy chọn; nếu bỏ trống workflow dùng `project_id` trong
-  `supabase/config.toml`)
-
-Secrets:
-- `SUPABASE_ACCESS_TOKEN` — Supabase Personal Access Token có dạng `sbp_...`.
-- `SUPABASE_DB_PASSWORD` — mật khẩu database remote.
-
-Workflow sẽ validate các giá trị trước bước `supabase link` và không in token
-hoặc mật khẩu vào log. Nếu dùng Environment Secrets/Variables thay vì cấp
-Repository, job phải khai báo đúng `environment` tương ứng; mặc định workflow
-này đọc Repository Secrets/Variables.
-
-Sau đó chạy workflow `Deploy Supabase` hoặc push thay đổi trong `supabase/**`.
-
-## 8. Cấu trúc
-
-```text
-src/app/
-├── core/
-│   ├── auth/
-│   ├── guards/
-│   └── supabase/
-├── layout/
-└── features/
-    ├── auth/
-    ├── dashboard/
-    ├── classes/
-    ├── students/
-    ├── attendance/
-    ├── finance/
-    ├── staff/
-    └── settings/
-
-supabase/
-├── migrations/
-└── functions/
-    ├── _shared/
-    ├── health/
-    ├── dashboard-summary/
-    └── attendance-bulk-upsert/
-```
-
-## 9. Nguyên tắc code
-
-- CRUD đọc đơn giản: Angular → Supabase Data API → RLS.
-- Nghiệp vụ tiền/lương/đóng tháng: Angular → Edge Function → DB.
-- Không hard-code role/tỷ lệ lương trong FE.
-- Không dùng service-role/secret key trong browser.
-- Không xóa cứng payment/payroll/audit.
-- Mọi logic tài chính quan trọng phải idempotent + transaction + audit.
-- Không dùng `.env`/`environment.ts` cho cấu hình Supabase frontend.
-
-## 10. Kiểm thử và chất lượng
+Yêu cầu Node.js `>= 22.22.3` và npm:
 
 ```bash
 npm ci
-npm test
-npm run build
-/home/daovanhung/.local/bin/deno check --no-config --node-modules-dir=auto supabase/functions/_shared/*.ts supabase/functions/*/index.ts
+npm start
 ```
 
-Nếu có Docker, xác thực migration bằng `npm run supabase:start`, `npm run supabase:reset` và `npm run supabase:status` trước khi dùng `npm run supabase:types`.
+Frontend dùng URL và publishable key trong `src/app/core/config/supabase.constants.ts`. Không đưa service key/secret vào Angular.
 
-## 11. Roadmap ưu tiên
+## Database và seed
 
-1. Auth + profile/role.
-2. CRUD Class/Student/Enrollment.
-3. Session + Attendance + Evaluation.
-4. Tuition + Payment + Debt.
-5. Staff + Assignment + Payroll.
-6. Period close + carry-over + report.
-7. Excel migration/reconciliation.
-# HVC_EDU
+Migration mới không sửa lịch sử migration cũ:
+
+- `supabase/migrations/202609060005_minimal_system.sql`: dựng schema, RPC và RLS tối giản.
+- `supabase/migrations/202609060006_remove_legacy_objects.sql`: xóa bảng/type legacy còn sót.
+- `supabase/migrations/202609060007_tenant_guards.sql`: siết tenant scope cho các RPC cập nhật theo ID.
+- `supabase/migrations/202609060008_dashboard_staff_scope.sql`: giới hạn số liệu nhân sự trên Dashboard Staff.
+
+Target seed cố định là Supabase project `ytixnjosaruvpnlvkesv`. Sau khi đã backup data-only ngoài repository, chạy:
+
+```bash
+bash scripts/reset-and-seed-master-data.sh
+```
+
+Script dùng Storage API để xóa object trong `center-imports`, giữ bucket, sau đó giữ Admin/center `HC`, xóa dữ liệu vận hành cũ và seed 4 lớp, 50 học sinh, 5 nhân sự, 50 enrollment, 8 lịch tuần và 8 phân công. Seed không tạo session, attendance, evaluation, chấm công hoặc thu chi.
+
+## Edge Functions
+
+`health`, `dashboard-summary`, `admin-master-data`, `generate-class-sessions`, `attendance-bulk-upsert`, `evaluation-bulk-upsert`, `staff-attendance`, `invite-staff-account`, `record-financial-transaction`.
+
+Mutation đi theo đường `Angular → Edge Function → RPC transaction → audit_logs`; RLS giới hạn Staff theo assignment và cấm Staff đọc finance/quản lý master data.
+
+## Kiểm thử
+
+```bash
+npm test
+npm run build
+deno check --no-config --node-modules-dir=auto supabase/functions/_shared/*.ts supabase/functions/*/index.ts
+```
+
+Local Supabase cần Docker/Podman:
+
+```bash
+supabase db reset
+```
+
+## Cấu trúc chính
+
+```text
+src/app/features/
+├── auth/              # login, reset password
+├── home/              # dashboard
+├── education/         # hub lớp/học sinh
+├── classes/           # lớp, lịch, roster, session
+├── attendance/        # điểm danh, nhận xét
+├── people/            # nhân sự, mời tài khoản
+├── staff/             # chấm công theo ngày
+├── finance/           # sổ thu chi
+└── account/           # hồ sơ và mật khẩu
+```

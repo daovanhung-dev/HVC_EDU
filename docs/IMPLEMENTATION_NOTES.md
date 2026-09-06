@@ -1,74 +1,32 @@
-# Implementation notes
+# Implementation notes · HVC EDU tối giản
 
-## Gap closures
+## Kiến trúc hiện tại
 
-- `tuition-summary` implements the SCR-16 contract as a dedicated read Edge Function.
-- `void-payment` implements BR-10 without deleting the payment; the ledger is recalculated from active payments and the action is audited.
-- `fund_ledger`, `profit_distributions`, `import_jobs`, `import_job_issues` and `idempotency_requests` close the supporting-schema gaps in the plan.
-- Financial/session/attendance/evaluation/payroll/close mutations use PostgreSQL RPCs so multi-step writes are atomic and auditable.
-- `calculate-payroll` is server-side and validates the policy, staff type, assignment, cap and rounding before `rpc_save_payroll_run` persists the draft.
-- Class creation and student + enrollment creation use transactional RPCs so a failed second write cannot leave an orphaned master record.
-- Class, student and staff edit/deactivate flows use audited admin-only RPCs; deactivating a student closes active enrollments with history preserved.
-- Tuition preview, debt adjustments/carry-over, payment void and data-integrity checks are wired to their screens.
-- Role changes use `update-profile-role` → `rpc_update_profile_role` and include before/after audit data.
-- Fixbug package: class edits validate grade/fee and duplicate code with full before/after audit; historical tuition ledgers remain unchanged.
-- Enrollment status changes use audited `rpc_update_enrollment_status`; `LEFT` requires an end date and is terminal. Re-entry uses audited `rpc_create_enrollment` and a new row.
-- Payroll UI is read-only and hydrates staff/class names from `payroll_items`; money is shown only to Admin/Accountant, while teaching roles retain assignment names without amounts.
-- Staff accounts use `staff.email`, a center-scoped unique lower-case index, Admin-only `invite-staff-account`, rollback of a newly invited Auth user on link failure, and one-way profile locking when staff becomes inactive.
-- Direct browser writes for classes, students, staff and enrollments are revoked; their current create/update flows use audited RPCs, preventing bypass of validation, history retention and terminal `LEFT` enrollment rules.
+Frontend chỉ giữ các route `/dashboard`, `/classes`, `/classes/:id`, các route session attendance/evaluation, `/staff`, `/staff/attendance`, `/finance`, `/account`, `/login` và `/reset-password`.
 
-## Known environment limitation
+Backend giữ `centers`, `profiles`, `audit_logs` và 11 bảng vận hành: `staff`, `classes`, `class_schedules`, `students`, `enrollments`, `class_assignments`, `class_sessions`, `attendance`, `student_evaluations`, `staff_attendance`, `financial_transactions`.
 
-The current runner has the Supabase CLI and Deno but no Docker/Podman, so migrations cannot be reset/linted locally and generated Supabase types cannot be refreshed from a live schema. The checked-in `database.types.ts` is therefore a minimal compile-time contract, not a generated snapshot.
+Các mutation quan trọng đều đi qua RPC `SECURITY DEFINER`, kiểm tra role/tenant/assignment, ghi `audit_logs` và trả response envelope từ Edge Function. Sinh session idempotent nhờ unique slot `(class_id, session_date, start_time)`.
 
-## Known source-data limitation
+## Quy tắc quyền
 
-The supplied operational workbook is validated server-side, stored in the private import bucket, and imported through the normalized workbook RPC. It maps classes/schedules, staff/assignments, students/enrollments, sessions, C/N attendance, comments as evaluations, tuition snapshots/payments, carry-over/opening-debt adjustments, expenses, payroll, fund ledger and profit distributions. Formula/report/instruction sheets remain preserved in the private source file and reconciliation summary rather than being duplicated into business tables. `#REF!` cells are recorded as warnings and ignored per the import decision; they are never converted to zero. The August 2026 source still has two L09 roster students without accounting rows, 153 blank attendance cells, and two expense rows with missing date/category/description; these are retained as explicit warnings and are not fabricated.
+- `ADMIN`: toàn quyền trong center, bao gồm nhân sự, master data, sinh session và thu chi.
+- `STAFF`: chỉ đọc lớp có assignment còn hiệu lực, thao tác attendance/evaluation của lớp đó và tự ghi chấm công.
+- Finance chỉ có policy đọc cho Admin; không có grant ghi trực tiếp từ trình duyệt.
+- Tài khoản Staff được tạo bằng `invite-staff-account`; không có shared account.
 
-## Decisions
+## Master data
 
-- Money stays integer VND (`bigint` in PostgreSQL); ratios/policies use `numeric`.
-- Overpayment is blocked with `PAYMENT_EXCEEDS_DEBT`.
-- Closing carries outstanding debt to the next open period, when one exists, using linked `CARRY_IN`/`CARRY_OUT` adjustments and unique source keys.
-- Confirmed/paid ledgers and approved payroll are not overwritten by recalculation.
-- No service-role or secret key is referenced by Angular.
+Nguồn seed là `docs/fill_data/Nguon_Data_Van_Hanh_TrungTam_HungCuong.md`. Kết quả remote đã xác nhận: L06/L07/L08/L09 có lần lượt 18/13/7/12 học sinh; không tạo dữ liệu tháng hoặc tài chính.
 
-## Class deletion
+## Vận hành reset
 
-- Class deletion is Admin-only through audited `rpc_delete_class`; direct Data API deletes remain unavailable.
-- An empty class may be physically deleted with its weekly schedules; a class referenced by enrollment, sessions, assignments, rewards, finance, payroll or period snapshots is deactivated instead so history remains intact.
-- Deactivation disables active schedules and non-closed period class configurations, and session generation rejects inactive classes.
+`scripts/reset-and-seed-master-data.sh` kiểm tra đúng project, gọi Storage API cho bucket `center-imports`, sau đó chạy SQL trong một transaction. SQL giữ các profile ADMIN và center `HC`, xóa auth user non-admin, seed master data và ghi hai audit record mới. Bản backup tạm không nằm trong repository.
 
-## Class schedule editing
+## Xác nhận remote ngày 2026-09-06
 
-- Schedule changes use Admin-only `rpc_save_class_schedule` with validation and audit logging.
-- An already-effective schedule is never rewritten: the old row is closed/deactivated and a new effective-dated row is created. Existing `class_sessions` remain unchanged; the new schedule is used by later session generation.
-- Direct authenticated schedule writes are revoked. Class creation, month setup and import continue to write schedules through their security-definer transactional RPCs.
-
-## Teaching “My Classes” view
-
-- `TEACHER` and `ASSISTANT` receive a dedicated `/my-classes` navigation item and read-only detail route.
-- Current classes are derived from active, date-effective `class_assignments`; class/student/session/attendance/evaluation reads remain protected by existing center and assignment-aware RLS.
-- The view shows all accessible session history for the assigned class but only active enrollment/student rows, with no finance or admin mutation surface.
-
-## Teaching schedule fallback
-
-- The teaching schedule reads generated `class_sessions` as the authoritative source for attendance, evaluations and work attendance.
-- When a visible active `class_schedules` row has no generated session in the selected range, Angular renders a `WEEKLY_SCHEDULE` read-only occurrence instead of fabricating a backend session.
-- Weekly occurrences are merged by `(class_id, session_date, start_time)` so a generated session is never duplicated; only real session IDs can reach attendance, evaluation or check-in routes.
-
-## Per-enrollment tuition override
-
-- Admin changes to an active enrollment's `unit_price_override` use audited `rpc_update_enrollment_unit_price`; direct browser enrollment writes remain revoked.
-- The override is an integer VND unit price. `null` means the enrollment uses the class price, while zero is a valid free unit price.
-- `LEFT` enrollment rows are terminal and read-only for price changes; re-entry creates a new enrollment row through the existing audited RPC.
-- The mutation updates enrollment configuration only. Existing tuition ledger snapshots are not rewritten; future generation uses the new override for new/DRAFT ledgers and preserves `CONFIRMED`, `PARTIAL`, `UNPAID` and `PAID` history.
-
-## Rebuild workflow notes (2026-09-06)
-
-- The new Angular route tree is hub-first. Existing detail components remain available behind hub tabs or compatibility paths so class, student, finance, audit and import operations are not discarded during the transition.
-- `rpc_create_month_setup` is the only final write for the wizard. It generates sessions in the same transaction as the new period and rolls back the whole setup if any class, roster, schedule or assignment validation fails.
-- Existing periods receive `LEGACY_ASSIGNMENT` in `period_settings`; wizard-created periods receive `APPROVED_WORK_ATTENDANCE`. No historical check-in rows are fabricated.
-- Work attendance is per `class_sessions` row and `staff_id`. Direct browser insert/update is not granted; submit/review/availability/notification writes use security-definer RPCs through Edge Functions.
-- Notification reads are recipient-only. Admin fan-out is performed by RPC; automatic admin alerts cover submitted work, payroll pending approval, close blockers and import errors.
-- Remote deployment is intentionally separate from this code change. Apply the additive migration and deploy the new functions before releasing the Angular bundle.
+- Migration `202609060005` đến `202609060008` đã áp dụng.
+- Remote chỉ còn 9 Edge Function tối giản.
+- `admins=1`, `profiles=1`, `hc_centers=1`, `classes=4`, `students=50`, `enrollments=50`, `staff=5`, `schedules=8`, `assignments=8`.
+- `sessions=0`, `attendance=0`, `evaluations=0`, `staff_attendance=0`, `finance=0`.
+- Bucket `center-imports` tồn tại, private và không có object.

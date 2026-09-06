@@ -18,6 +18,6 @@ export function requiredUuid(value: unknown): string {
 }
 
 export function nonNegativeInteger(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) throw new Error('VALIDATION_ERROR');
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) throw new Error('VALIDATION_ERROR');
   return value;
 }

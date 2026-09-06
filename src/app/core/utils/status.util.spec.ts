@@ -4,7 +4,6 @@ import { roleLabel, statusLabel, statusTone } from './status.util';
 describe('status utilities', () => {
   it('translates business status codes into human-readable Vietnamese labels', () => {
     expect(statusLabel('ACTIVE')).toBe('Đang hoạt động');
-    expect(statusLabel('PARTIAL')).toBe('Thanh toán một phần');
     expect(statusLabel('PRESENT')).toBe('Có mặt');
   });
 
@@ -15,8 +14,8 @@ describe('status utilities', () => {
   });
 
   it('maps statuses to accessible visual tones', () => {
-    expect(statusTone('APPROVED')).toBe('positive');
-    expect(statusTone('CLOSING')).toBe('warning');
+    expect(statusTone('COMPLETED')).toBe('positive');
+    expect(statusTone('SCHEDULED')).toBe('warning');
     expect(statusTone('CANCELLED')).toBe('danger');
     expect(statusTone('CUSTOM_STATUS')).toBe('neutral');
   });

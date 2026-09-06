@@ -77,7 +77,6 @@ export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any)
       const linked = await callRpc(ctx, 'rpc_link_staff_account', {
         p_staff_id: staff.id,
         p_user_id: invited.data.user.id,
-        p_email: email,
         p_trace_id: traceId,
       });
       return finish(request, ok({ ...(linked as Record<string, unknown>), invite_sent: true }, traceId, 201));

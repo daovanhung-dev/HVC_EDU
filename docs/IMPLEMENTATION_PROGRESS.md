@@ -1,195 +1,28 @@
-# Implementation progress
+# Implementation progress · HVC EDU tối giản
 
-Kế hoạch nguồn: `docs/tasks/PLAN_GPT_LUNA_FULL_SYSTEM.md`.
-Business source of truth: `docs/BD_HeThong_QuanLy_TrungTam_HungCuong.md`.
+## Trạng thái
 
-## STEP 01–10 — Foundation, schema, RLS, RPC, Edge framework
+Kế hoạch viết lại hệ thống tối giản đã được triển khai trong worktree và remote Supabase project `ytixnjosaruvpnlvkesv`.
 
-Status: DONE (static/type-check evidence)
+## Đã hoàn tất
 
-Implemented:
+- Thay route/navigation/shell cũ bằng Dashboard, Lớp học, Nhân sự, Chấm công, Thu chi và Tài khoản.
+- Viết lại Angular service/component theo schema tối giản; bỏ PeriodContext, month setup, tuition, payment, debt, payroll, carry-over, fund/profit, import, notification và audit UI.
+- Thêm CRUD Admin cho staff/class/student, enrollment lịch sử, schedule, assignment và soft-deactivate.
+- Thêm sinh session theo lịch tuần, điểm danh, nhận xét theo session và chấm công staff theo ngày.
+- Thêm sổ giao dịch INCOME/EXPENSE, tổng doanh thu, tổng chi và số dư.
+- Thêm migration schema/RLS/RPC, Edge Functions, seed/reset có backup và audit.
+- Regenerate `database.types.ts` từ schema remote.
+- Gỡ Edge Function legacy khỏi remote và source local.
 
-- Removed frontend `.env`/`environment.ts` runtime path; browser only reads `supabase.constants.ts`.
-- Added application constants, Supabase response/error/validation/auth/RPC helpers.
-- Added 24 BD tables plus import/idempotency support tables, indexes, updated-at triggers, private import bucket and tenant/assignment-aware RLS.
-- Added atomic RPCs for sessions, attendance, evaluations, tuition, payments/voids, adjustments, carry-over, payroll, period close, settings, finance, rewards and profile permissions.
-- Added standard success/error envelopes with `traceId`; mutation functions support `x-idempotency-key`.
+## Kiểm thử đã chạy
 
-Files: `supabase/migrations/202609040001_initial_schema.sql` through `202609040006_seed_reference.sql`, `supabase/functions/_shared/*`.
-
-Tests: `deno check --no-config --node-modules-dir=auto supabase/functions/_shared/*.ts supabase/functions/*/index.ts` PASS.
-
-## STEP 11 — Supabase local validation and remote runtime
-
-Status: LOCAL BLOCKED BY ENVIRONMENT; REMOTE APPLIED
-
-`supabase db reset`, local lint and generated type refresh require Docker/Podman. The installed CLI reports that neither Docker nor Podman is available in this environment. The configured remote project has migrations through `202609040011` applied and the import function deployed; the remote workbook import and integrity smoke checks completed.
-
-## STEP 12–30 — Auth, shell, period, education, finance, payroll, reports, settings, audit, migration
-
-Status: IMPLEMENTED; runtime acceptance requires a configured Supabase project.
-
-Implemented:
-
-- 29 requested routes with standalone lazy components, auth/guest/role guards and role-aware navigation.
-- Real Data API reads and Edge Function/RPC writes for class, schedule/session, student/enrollment, attendance, evaluation, tuition, payment, debt, finance, payroll, fund/profit, reports, period, settings, audit and migration flows.
-- Period context selector, responsive UI primitives, loading/error/empty states, toast and confirmation prompts.
-- Server payroll calculation uses configurable policy, integer VND, cap and floor-to-step rounding; Angular does not calculate payroll.
-- Tuition preview returns per-enrollment calculations and warnings; generate protects confirmed/paid ledgers.
-- Import upload/validation is server-side, stores source privately, records issues and rejects `#REF!`.
-
-## STEP 31 — Unit tests
-
-Status: DONE (available scope)
-
-Tests cover money formatting/parsing, date helpers and API error mapping: 3 files, 4 tests passing.
-
-## STEP 32 — Integration/business tests
-
-Status: READY, not executable without local Supabase
-
-Critical paths are represented by transactional RPCs and the matrix in `docs/BD_TRACEABILITY_MATRIX.md`. Execute the SQL/RLS smoke suite after Docker or a configured project is available.
-
-## STEP 33–35 — Build and GitHub Pages readiness
-
-Status: DONE for local build gates
-
-- `npm ci` PASS.
-- `npm test` PASS.
-- `npm run build` PASS.
-- Pages build with repository base href passed locally; the workflow will repeat the same gate in CI.
-- `404.html` fallback is produced by the Pages workflow.
-
-## STEP 36 — Supabase deployment readiness
-
-Status: REMOTE DEPLOYED; CI deployment remains available
-
-The workflow uses GitHub Secrets for access token/database password and a repository variable for project ref. The configured remote project is deployed from this workspace; frontend constants contain the public project URL/publishable key only.
-
-## STEP 37 — BD reconciliation
-
-Status: DONE WITH SOURCE WARNINGS
-
-The source workbook `docs/excels/TrungTam_HungCuong_T8 (1).xlsx` was imported into the remote center for August 2026. Reconciled totals are: tuition due/paid 14,485,000 VND, payroll 5,794,000 VND, other expenses 6,270,898 VND, fund contribution 242,010 VND and distributable profit 2,178,092 VND. Runtime warnings preserve the source discrepancies: two L09 roster students have no accounting rows, 153 attendance cells are blank, two expense rows use explicit fallback metadata, and nine `#REF!` cells are ignored.
-
-## STEP 38 — Fixbug implementation
-
-Status: IMPLEMENTED; remote migrations and invite function deployed
-
-- Class detail now edits class master fields with integer-VND/grade validation, duplicate-code handling and inactive status preservation.
-- Student/class roster and student history can end an active enrollment with a required end date; ended enrollments cannot be reopened, and the student detail can create a new enrollment for re-entry.
-- Payroll shows staff/class names and read-only revenue, rate, base, bonus, penalty and final amount breakdown. Amounts remain restricted to Admin/Accountant.
-- Staff list/detail show email/account state and expose the invite action only to Admin. `invite-staff-account` links the invited Auth user through an audited RPC and removes the new Auth user if linking fails.
-- Remote: migrations `202609040012_staff_accounts_enrollment.sql` through `202609040016_enrollment_reentry_guard.sql` applied; `invite-staff-account` deployed.
-- Verification: Angular tests 3 files/4 tests PASS; Angular production build PASS; Deno function check PASS; Supabase migration dry-run and remote apply PASS. A real invite delivery test remains intentionally unsent until an approved test recipient is provided.
-
-## STEP 39 — Rebuild workflow tối giản HVC_EDU
-
-Status: IMPLEMENTED IN WORKTREE; DATABASE RUNTIME/REMOTE DEPLOY PENDING
-
-Implemented in the additive migration `supabase/migrations/202609060001_rebuild_workflows.sql`:
-
-- `period_class_configs` and `period_settings` snapshots with legacy payroll backfill.
-- Atomic `rpc_create_month_setup` covering period, class snapshot, schedules, sessions, assignments, enrollment actions, settings and linked carry-over.
-- `staff_work_attendance` with per-session `CHECK_IN`/`CHECK_OUT`, `SUBMITTED`/`APPROVED`/`REJECTED` review path, audit and notifications.
-- `staff_availability` and recipient-scoped `notifications`, manual fan-out and automatic admin alerts.
-- New-period tuition/session functions read period snapshots; new-period payroll reads only approved work attendance; close preview/RPC block unresolved work attendance.
-
-Implemented in Angular:
-
-- Role-based hubs for home, month setup, education, teaching, finance, people, notifications, account and settings.
-- Nine-step browser draft month wizard and one final `create-month-setup` call.
-- Mobile-first teaching cards with check-in/out and links to attendance/evaluation actions.
-- Notification inbox, unread badge, read-all and Admin compose form.
-- Compatibility redirects for legacy finance, payroll, attendance/evaluation, audit, migration, reports and assignment bookmarks.
-
-Verification in this runner:
-
-- `npm ci`: PASS using temporary Node `22.22.3`.
-- `npm test`: PASS, 7 test files / 13 tests.
+- `npm test`: PASS, 6 test files / 13 tests.
 - `npm run build`: PASS.
 - `deno check --no-config --node-modules-dir=auto supabase/functions/_shared/*.ts supabase/functions/*/index.ts`: PASS.
-- `supabase db lint` and `supabase db reset`: NOT RUN successfully because local Postgres/Docker runtime is unavailable (`127.0.0.1:54322`, no Docker/Podman). Migration `202609060001_rebuild_workflows.sql` was later applied to the linked remote project.
+- Remote smoke: Dashboard RPC và sinh session gọi hai lần trong cùng transaction cho kết quả 16 rồi 0, transaction rollback.
+- `git diff --check`: PASS sau khi hoàn tất chỉnh sửa.
 
-## STEP 40 — Xóa lớp an toàn
+## Giới hạn môi trường
 
-Status: IMPLEMENTED; remote migration applied
-
-- Added Admin-only audited `rpc_delete_class`.
-- Empty classes are physically deleted with weekly schedules; classes with operational, financial or period history are deactivated and preserved.
-- Deactivation disables active schedules/open period snapshots; inactive classes cannot generate new sessions.
-- Added the Admin-only `Xóa lớp` action to class detail with confirmation, loading state and navigation back to the class list.
-- Remote migrations `202609060001_rebuild_workflows.sql` and `202609060002_class_deletion.sql` are applied.
-
-Verification:
-
-- `supabase db push --dry-run`: PASS.
-- `supabase db push`: PASS.
-- Remote migration list: `202609060001` and `202609060002` present.
-- Admin JWT smoke call to `rpc_delete_class` with an unknown UUID returned the expected `CLASS_NOT_FOUND` without changing data.
-- Angular `npm test` / `npm run build`: NOT RUN in this runner because `node`, `npm` and `npx` are unavailable.
-
-## STEP 42 — Lớp của tôi cho giáo viên/trợ giảng
-
-Status: IMPLEMENTED IN WORKTREE; frontend build pending
-
-- Added the teaching-only `Lớp của tôi` sidebar item and protected `/my-classes` and `/my-classes/:classId` routes.
-- Added read-only class and history service using existing assignment-aware RLS; only current assignments and active students are shown.
-- Added class overview/detail cards for weekly schedules, student contact information, all accessible session history, attendance summaries and evaluation comments/scores.
-- No financial data or administrative mutations are exposed in the teaching view.
-
-Verification:
-
-- Navigation and route role tests updated for Teacher/Assistant access and Admin/Accountant menu exclusion.
-- `git diff --check`: PASS.
-- `npm test` / `npm run build`: NOT RUN in this runner because `node`, `npm` and `npx` are unavailable.
-
-## STEP 41 — Sửa lịch học theo phiên bản
-
-Status: IMPLEMENTED; remote migration applied
-
-- Added the Admin-only `rpc_save_class_schedule` mutation with schedule validation and audit logging.
-- Editing an already-effective schedule closes the old version and creates a new version from the effective date; generated sessions and prior schedule history are preserved.
-- The class schedule screen now supports adding and editing weekday/time/effective-date values; schedule writes no longer use the browser Data API directly.
-- Direct authenticated insert/update/delete grants for `class_schedules` are revoked; server-side class/month setup/import workflows retain their security-definer path.
-
-Verification:
-
-- Migration `202609060003_class_schedule_edit.sql` applied to the linked remote project.
-- Admin RPC smoke call rejected an unknown class with `CLASS_NOT_FOUND` without changing data.
-- Remote migration list and `deno check` passed.
-- Angular `npm test` / `npm run build`: NOT RUN in this runner because `node`, `npm` and `npx` are unavailable.
-
-## STEP 43 — Sửa hiển thị lịch dạy chưa sinh session
-
-Status: IMPLEMENTED IN WORKTREE; local quality gates PASS
-
-- Teaching schedule now loads actual `class_sessions` across all periods overlapping the selected day/week, instead of depending on the globally selected latest period.
-- Active effective weekly schedules are materialized as read-only planned cards when a period or generated session is not available; generated sessions always take precedence and receive work-attendance data.
-- Planned cards expose no attendance, evaluation or check-in action and explain that Admin must create the period and generate sessions.
-- Date calculations use UTC date arithmetic so Sunday 06/09/2026 maps to ISO weekday 7 without timezone drift.
-
-Verification:
-
-- Added unit coverage for ISO weekday/range/effective-window helpers and service fallback/deduplication behavior.
-- `git diff --check`: PASS.
-- `npm ci`: PASS using temporary Node 22.22.3; 0 vulnerabilities.
-- `npm test`: PASS, 9 test files / 20 tests.
-- `npm run build`: PASS.
-- `deno check --no-config --node-modules-dir=auto supabase/functions/_shared/*.ts supabase/functions/*/index.ts`: PASS.
-
-## STEP 44 — Chỉnh học phí riêng theo học sinh
-
-Status: IMPLEMENTED IN WORKTREE; remote migration pending
-
-- Added Admin-only audited `rpc_update_enrollment_unit_price` for active enrollments; direct browser enrollment writes remain revoked.
-- Class detail roster and student detail enrollment history now support editing the per-enrollment unit price, including clearing it back to the class price.
-- Historical/closed enrollments remain read-only. Existing tuition ledger snapshots are not modified by the enrollment update.
-- Added unit coverage for numeric/null updates, validation and non-Admin mutation blocking.
-
-Verification:
-
-- `npm test`: PASS, 11 test files / 26 tests.
-- `npm run build`: PASS.
-- `deno check --no-config --node-modules-dir=auto supabase/functions/_shared/*.ts supabase/functions/*/index.ts`: PASS.
-- Remote migration deployment is pending; apply the additive migration through the normal Supabase CI/deployment path before using the new action in production.
+`supabase db reset` local cần Docker/Podman, hiện máy không có runtime này. Các migration `202609060005`–`202609060008` và reset/seed remote đã chạy bằng Supabase CLI; workflow Supabase vẫn chạy `npm ci`, validate cấu hình và deploy.

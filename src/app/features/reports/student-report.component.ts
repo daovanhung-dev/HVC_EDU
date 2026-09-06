@@ -1,8 +1,0 @@
-import { Component, OnInit, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { SupabaseService } from '../../core/supabase/supabase.service';
-import { PeriodContextService } from '../../core/services/period-context.service';
-@Component({selector:'app-student-report',standalone:true,imports:[RouterLink],template:`
-<section class="page-header"><div><p class="eyebrow">BÁO CÁO</p><h1>Báo cáo học tập học sinh</h1></div><button class="secondary" (click)="load()">Làm mới</button></section>@if(error()){<div class="alert">{{error()}}</div>}<div class="card table-wrap"><table><thead><tr><th>Học sinh</th><th>Lớp</th><th>Có mặt</th><th>Vắng</th><th>Có phép</th><th>Đánh giá</th></tr></thead><tbody>@for(r of rows();track r.student_id+r.class_id){<tr><td>{{r.student?.full_name||r.student_id}}</td><td>{{r.class?.code||r.class_id}}</td><td>{{r.present_count}}</td><td>{{r.absent_count}}</td><td>{{r.excused_count}}</td><td><a class="button-link" [routerLink]="['/students',r.student_id]">Hồ sơ</a></td></tr>}@empty{<tr><td colspan="6" class="empty">Chưa có dữ liệu.</td></tr>}</tbody></table></div>
-`})
-export class StudentReportComponent implements OnInit{rows=signal<any[]>([]);error=signal('');constructor(private readonly supabase:SupabaseService,readonly period:PeriodContextService){}ngOnInit(){void this.load();}async load(){const p=this.period.current();if(!p)return;const r=await this.supabase.client.from('v_student_attendance_summary').select('*,student:students(full_name),class:classes(code)').eq('period_id',p.id);if(r.error)this.error.set(r.error.message);else this.rows.set(r.data||[]);}}

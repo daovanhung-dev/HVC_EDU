@@ -12,7 +12,7 @@ import { AuthService } from '../../core/auth/auth.service';
       <form class="auth-card" (ngSubmit)="submit()">
         <div>
           <p class="eyebrow">TRUNG TÂM HÙNG CƯỜNG</p>
-          <h1>Đăng nhập quản trị</h1>
+          <h1>Đăng nhập hệ thống</h1>
           <p class="muted">Angular + Supabase</p>
         </div>
 

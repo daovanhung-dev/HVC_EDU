@@ -1,25 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { routes } from './app.routes';
 
-describe('workflow routes', () => {
+describe('minimal routes', () => {
   const children = routes.find((route) => route.path === '')?.children ?? [];
 
-  it('keeps canonical hubs for the rebuilt workflow', () => {
-    expect(children.map((route) => route.path)).toEqual(expect.arrayContaining([
-      'dashboard', 'periods', 'classes', 'students', 'teaching-schedule', 'work', 'staff', 'finance', 'notifications', 'account', 'settings',
-      'my-classes', 'my-classes/:classId',
-    ]));
+  it('contains only the operational application routes', () => {
+    expect(children.map((route) => route.path)).toEqual([
+      '', 'dashboard', 'classes', 'classes/:id', 'classes/:classId/sessions/:sessionId/attendance',
+      'classes/:classId/sessions/:sessionId/evaluation', 'staff', 'staff/attendance', 'finance', 'account',
+    ]);
   });
 
-  it('protects My Classes for teaching roles', () => {
-    expect(children.find((route) => route.path === 'my-classes')?.data).toMatchObject({ roles: ['ADMIN', 'TEACHER', 'ASSISTANT'] });
-    expect(children.find((route) => route.path === 'my-classes/:classId')?.data).toMatchObject({ roles: ['ADMIN', 'TEACHER', 'ASSISTANT'] });
-  });
-
-  it('maps legacy bookmarks to the new hubs', () => {
-    expect(children.find((route) => route.path === 'finance/tuition')?.data).toMatchObject({ target: 'finance', defaultTab: 'tuition' });
-    expect(children.find((route) => route.path === 'payroll')?.data).toMatchObject({ target: 'payroll' });
-    expect(children.find((route) => route.path === 'attendance/:sessionId')?.data).toMatchObject({ target: 'teaching-schedule' });
-    expect(children.find((route) => route.path === 'audit')?.data).toMatchObject({ target: 'settings', defaultTab: 'audit' });
+  it('protects staff and finance management for Admin', () => {
+    expect(children.find((route) => route.path === 'staff')?.data).toMatchObject({ roles: ['ADMIN'] });
+    expect(children.find((route) => route.path === 'finance')?.data).toMatchObject({ roles: ['ADMIN'] });
   });
 });

@@ -1,27 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { NAVIGATION_ITEMS, SECONDARY_NAVIGATION, canAccessNavigationItem } from './navigation.config';
 
-describe('navigation configuration', () => {
-  it('exposes the simplified role-based workflow hubs', () => {
-    expect(NAVIGATION_ITEMS.map((item) => item.id)).toEqual([
-      'home', 'months', 'my-classes', 'classes', 'students', 'teaching-schedule', 'staff', 'finance', 'work', 'notifications',
-    ]);
-    expect(NAVIGATION_ITEMS.find((item) => item.id === 'finance')?.path).toBe('/finance');
-    expect(SECONDARY_NAVIGATION.map((item) => item.id)).toEqual(['settings', 'account']);
+describe('minimal navigation', () => {
+  it('contains only the operational modules', () => {
+    expect(NAVIGATION_ITEMS.map((item) => item.id)).toEqual(['dashboard', 'classes', 'staff', 'staff-attendance', 'finance']);
+    expect(SECONDARY_NAVIGATION.map((item) => item.id)).toEqual(['account']);
   });
 
-  it('keeps role visibility separate from route authorization', () => {
-    const schedule = NAVIGATION_ITEMS.find((item) => item.id === 'teaching-schedule')!;
-    const myClasses = NAVIGATION_ITEMS.find((item) => item.id === 'my-classes')!;
-    const work = NAVIGATION_ITEMS.find((item) => item.id === 'work')!;
+  it('limits finance and staff management to Admin', () => {
     const finance = NAVIGATION_ITEMS.find((item) => item.id === 'finance')!;
-    expect(canAccessNavigationItem(schedule, 'ASSISTANT')).toBe(true);
-    expect(canAccessNavigationItem(myClasses, 'TEACHER')).toBe(true);
-    expect(canAccessNavigationItem(myClasses, 'ASSISTANT')).toBe(true);
-    expect(canAccessNavigationItem(myClasses, 'ADMIN')).toBe(false);
-    expect(canAccessNavigationItem(myClasses, 'ACCOUNTANT')).toBe(false);
-    expect(canAccessNavigationItem(work, 'TEACHER')).toBe(true);
-    expect(canAccessNavigationItem(finance, 'TEACHER')).toBe(false);
-    expect(canAccessNavigationItem(finance, 'ACCOUNTANT')).toBe(true);
+    const staff = NAVIGATION_ITEMS.find((item) => item.id === 'staff')!;
+    const classes = NAVIGATION_ITEMS.find((item) => item.id === 'classes')!;
+    expect(canAccessNavigationItem(finance, 'STAFF')).toBe(false);
+    expect(canAccessNavigationItem(staff, 'STAFF')).toBe(false);
+    expect(canAccessNavigationItem(classes, 'STAFF')).toBe(true);
+    expect(canAccessNavigationItem(finance, 'ADMIN')).toBe(true);
   });
 });

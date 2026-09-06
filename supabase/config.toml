@@ -33,8 +33,23 @@ verify_jwt = false
 [functions.dashboard-summary]
 verify_jwt = true
 
+[functions.admin-master-data]
+verify_jwt = true
+
+[functions.generate-class-sessions]
+verify_jwt = true
+
 [functions.attendance-bulk-upsert]
 verify_jwt = true
 
+[functions.evaluation-bulk-upsert]
+verify_jwt = true
+
+[functions.staff-attendance]
+verify_jwt = true
+
 [functions.invite-staff-account]
+verify_jwt = true
+
+[functions.record-financial-transaction]
 verify_jwt = true

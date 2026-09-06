@@ -1,40 +1,32 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
-import { AppIconComponent } from '../../shared/components/app-icon.component';
-import { PageHeaderComponent } from '../../shared/components/page-header.component';
-import { TuitionComponent } from './tuition.component';
-import { PaymentFormComponent } from './payment-form.component';
-import { DebtsComponent } from './debts.component';
-import { TransactionsComponent } from './transactions.component';
-import { RewardsComponent } from './rewards.component';
-import { PayrollComponent } from './payroll.component';
-import { FundProfitComponent } from './fund-profit.component';
+import { FormsModule } from '@angular/forms';
+import { FinancialTransaction, MinimalService, TransactionType } from '../../core/services/minimal.service';
+import { ToastService } from '../../core/services/toast.service';
+import { formatMoney, parseMoney } from '../../core/utils/money.util';
 
-type FinanceTab = 'overview' | 'tuition' | 'payment' | 'debts' | 'transactions' | 'rewards' | 'payroll' | 'profit';
-type FinanceLink = { tab: Exclude<FinanceTab, 'overview'>; label: string; description: string; icon: string };
+type TransactionForm = { transaction_date: string; type: TransactionType; category: string; description: string; amount: string };
+const blankForm = (): TransactionForm => ({ transaction_date: MinimalService.iso(new Date()), type: 'INCOME', category: '', description: '', amount: '' });
 
 @Component({
   selector: 'app-finance',
   standalone: true,
-  imports: [RouterLink, AppIconComponent, PageHeaderComponent, TuitionComponent, PaymentFormComponent, DebtsComponent, TransactionsComponent, RewardsComponent, PayrollComponent, FundProfitComponent],
+  imports: [FormsModule],
   template: `
-    <app-page-header eyebrow="KẾ TOÁN" title="Trung tâm tài chính" description="Học phí, thu chi, payroll và lợi nhuận được gom vào một workflow theo tab." />
-    <nav class="hub-tabs" aria-label="Các tab kế toán"><a [class.active]="tab() === 'overview'" routerLink="/finance">Tổng quan</a>@for(item of links; track item.tab){<a [class.active]="tab() === item.tab" [routerLink]="['/finance']" [queryParams]="{ tab: item.tab }">{{ item.label }}</a>}</nav>
-    @if (tab() === 'overview') { <section class="finance-guide card"><div class="finance-guide-icon"><app-icon name="tuition" /></div><div><strong>Quy trình trong tháng</strong><p class="muted">Kiểm tra học phí → ghi nhận payment → theo dõi công nợ → xử lý payroll → đối soát thu/chi → xem quỹ và lợi nhuận.</p></div></section><section class="function-grid">@for(item of links; track item.tab){<a class="function-card card" [routerLink]="['/finance']" [queryParams]="{ tab: item.tab }"><span class="function-card-icon"><app-icon [name]="item.icon" /></span><span class="function-card-content"><strong>{{ item.label }}</strong><small>{{ item.description }}</small></span><span class="function-card-arrow">→</span></a>}</section> }
-    @else { <a class="button-link back-link" routerLink="/finance">← Về tổng quan kế toán</a>@switch (tab()) { @case ('tuition') { <app-tuition /> } @case ('payment') { <app-payment-form /> } @case ('debts') { <app-debts /> } @case ('transactions') { <app-transactions /> } @case ('rewards') { <app-rewards /> } @case ('payroll') { <app-payroll /> } @case ('profit') { <app-fund-profit /> } } }
+    <section class="page-header app-page-header"><div><p class="eyebrow">THU CHI</p><h1>Sổ thu chi</h1><p class="page-description muted">Ghi nhận các khoản thu, khoản chi và xem tổng doanh thu theo khoảng ngày.</p></div></section>
+    @if (error()) { <div class="alert">{{ error() }}</div> }
+    <form class="card form-card" (ngSubmit)="save()"><div class="panel-heading"><h2>Ghi nhận giao dịch</h2></div><div class="form-grid"><label>Ngày<input type="date" name="date" [(ngModel)]="form.transaction_date" required /></label><label>Loại<select name="type" [(ngModel)]="form.type"><option value="INCOME">Khoản thu</option><option value="EXPENSE">Khoản chi</option></select></label><label>Danh mục<input name="category" [(ngModel)]="form.category" placeholder="Ví dụ: học phí, điện nước" required /></label><label>Số tiền VND<input name="amount" inputmode="numeric" [(ngModel)]="form.amount" placeholder="0" required /></label><label class="span-2">Nội dung<input name="description" [(ngModel)]="form.description" required /></label></div><div class="form-actions"><button class="primary" type="submit" [disabled]="saving">{{ saving ? 'Đang lưu…' : 'Lưu giao dịch' }}</button></div></form>
+    <div class="toolbar card compact-toolbar"><label>Từ ngày<input type="date" [(ngModel)]="fromDate" /></label><label>Đến ngày<input type="date" [(ngModel)]="toDate" /></label><button class="primary" type="button" [disabled]="loading()" (click)="load()">Xem</button></div>
+    @if (loading()) { <section class="card loading-state"><span class="loading-spinner"></span><span>Đang tải sổ thu chi…</span></section> } @else { <section class="kpi-grid"><article class="card metric-card metric-money"><span>Tổng doanh thu</span><strong>{{ money(income()) }}</strong></article><article class="card metric-card metric-money"><span>Tổng chi</span><strong>{{ money(expense()) }}</strong></article><article class="card metric-card metric-money"><span>Số dư</span><strong [class.danger-text]="balance() < 0">{{ money(balance()) }}</strong></article></section><section class="card section-card section-heading-spaced"><div class="panel-heading"><div><p class="eyebrow">GIAO DỊCH</p><h2>{{ transactions().length }} giao dịch</h2></div></div><div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Loại</th><th>Danh mục</th><th>Nội dung</th><th class="number-cell">Số tiền</th></tr></thead><tbody>@for (item of transactions(); track item.id) { <tr><td>{{ item.transaction_date }}</td><td>{{ item.type === 'INCOME' ? 'Thu' : 'Chi' }}</td><td>{{ item.category }}</td><td>{{ item.description }}</td><td class="number-cell" [class.danger-text]="item.type === 'EXPENSE'">{{ item.type === 'EXPENSE' ? '-' : '+' }}{{ money(item.amount) }}</td></tr> } @empty { <tr><td colspan="5" class="empty">Chưa có giao dịch trong khoảng ngày.</td></tr> }</tbody></table></div></section> }
   `,
 })
 export class FinanceComponent implements OnInit {
-  readonly tab = signal<FinanceTab>('overview');
-  readonly links: FinanceLink[] = [
-    { tab: 'tuition', label: 'Học phí', description: 'Phải thu, đã thu và ledger theo lớp', icon: 'tuition' },
-    { tab: 'payment', label: 'Ghi nhận payment', description: 'Ghi nhận khoản thu học phí', icon: 'payment' },
-    { tab: 'debts', label: 'Công nợ & chuyển kỳ', description: 'Nợ đầu kỳ, điều chỉnh và carry-over', icon: 'debt' },
-    { tab: 'transactions', label: 'Thu/chi khác', description: 'Giao dịch ngoài học phí', icon: 'transactions' },
-    { tab: 'rewards', label: 'Thưởng học sinh', description: 'Quản lý khoản thưởng theo kỳ', icon: 'reward' },
-    { tab: 'payroll', label: 'Payroll', description: 'Preview, lưu draft và duyệt lương', icon: 'payroll' },
-    { tab: 'profit', label: 'Quỹ & lợi nhuận', description: 'Trích quỹ và phân phối lợi nhuận', icon: 'profit' },
-  ];
-  constructor(private readonly route: ActivatedRoute) {}
-  ngOnInit(): void { this.route.queryParamMap.subscribe((params) => { const value = params.get('tab') as FinanceTab | null; this.tab.set(value && this.links.some((item) => item.tab === value) ? value : 'overview'); }); }
+  readonly transactions = signal<FinancialTransaction[]>([]); readonly loading = signal(true); readonly error = signal(''); form = blankForm(); fromDate = MinimalService.currentMonth().from; toDate = MinimalService.currentMonth().to; saving = false;
+  constructor(private readonly minimal: MinimalService, private readonly toast: ToastService) {}
+  ngOnInit(): void { void this.load(); }
+  async load(): Promise<void> { this.loading.set(true); this.error.set(''); try { this.transactions.set(await this.minimal.listTransactions(this.fromDate, this.toDate)); } catch (error) { this.error.set(error instanceof Error ? error.message : 'Không thể tải sổ thu chi.'); } finally { this.loading.set(false); } }
+  income(): number { return this.transactions().filter((item) => item.type === 'INCOME').reduce((sum, item) => sum + Number(item.amount || 0), 0); }
+  expense(): number { return this.transactions().filter((item) => item.type === 'EXPENSE').reduce((sum, item) => sum + Number(item.amount || 0), 0); }
+  balance(): number { return this.income() - this.expense(); }
+  money(value: unknown): string { return formatMoney(Number(value || 0)); }
+  async save(): Promise<void> { const amount = parseMoney(this.form.amount); if (!this.form.category.trim() || !this.form.description.trim() || !Number.isSafeInteger(amount) || amount <= 0) { this.error.set('Danh mục, nội dung và số tiền phải hợp lệ; số tiền là số nguyên VND dương.'); return; } this.saving = true; this.error.set(''); try { await this.minimal.recordTransaction({ transaction_date: this.form.transaction_date, type: this.form.type, category: this.form.category, description: this.form.description, amount }); this.toast.success('Đã ghi nhận giao dịch.'); this.form = blankForm(); await this.load(); } catch (error) { this.error.set(error instanceof Error ? error.message : 'Không thể ghi nhận giao dịch.'); } finally { this.saving = false; } }
 }
