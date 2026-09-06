@@ -19,5 +19,6 @@ Run after `supabase start` and `supabase db reset` with two centers and four tes
 15. `DB-T15` — verify staff availability is center-scoped and a teacher can write only their own availability. Verify cross-center and non-recipient notification reads are denied.
 16. `DB-T16` — verify Admin manual notification fan-out to ALL/ROLE/USER creates one row per recipient, dedupes by key, and only the recipient can mark/read it.
 17. `DB-T17` — verify payroll pending, close blocker and import error events create recipient-scoped Admin inbox notifications with audit records.
+18. `DB-T18` — call `rpc_delete_class` as Admin for an empty class and verify the class/schedules are removed and `CLASS_DELETED` is audited; call it for a class with history and verify it returns `DEACTIVATED`, preserves dependent rows, disables active schedules/open period configs, and records `CLASS_DEACTIVATED`.
 
 Edge negative-case matrix: for every function call with no JWT, wrong role, malformed body, missing UUID/resource and closed-period mutation. Expected status/error codes are defined in `supabase/functions/_shared/error.ts`.

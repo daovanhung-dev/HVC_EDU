@@ -109,4 +109,22 @@ Verification in this runner:
 - `npm test`: PASS, 7 test files / 13 tests.
 - `npm run build`: PASS.
 - `deno check --no-config --node-modules-dir=auto supabase/functions/_shared/*.ts supabase/functions/*/index.ts`: PASS.
-- `supabase db lint` and `supabase db reset`: NOT RUN successfully because local Postgres/Docker runtime is unavailable (`127.0.0.1:54322`, no Docker/Podman). The new migration and functions have not been applied to production in this task.
+- `supabase db lint` and `supabase db reset`: NOT RUN successfully because local Postgres/Docker runtime is unavailable (`127.0.0.1:54322`, no Docker/Podman). Migration `202609060001_rebuild_workflows.sql` was later applied to the linked remote project.
+
+## STEP 40 — Xóa lớp an toàn
+
+Status: IMPLEMENTED; remote migration applied
+
+- Added Admin-only audited `rpc_delete_class`.
+- Empty classes are physically deleted with weekly schedules; classes with operational, financial or period history are deactivated and preserved.
+- Deactivation disables active schedules/open period snapshots; inactive classes cannot generate new sessions.
+- Added the Admin-only `Xóa lớp` action to class detail with confirmation, loading state and navigation back to the class list.
+- Remote migrations `202609060001_rebuild_workflows.sql` and `202609060002_class_deletion.sql` are applied.
+
+Verification:
+
+- `supabase db push --dry-run`: PASS.
+- `supabase db push`: PASS.
+- Remote migration list: `202609060001` and `202609060002` present.
+- Admin JWT smoke call to `rpc_delete_class` with an unknown UUID returned the expected `CLASS_NOT_FOUND` without changing data.
+- Angular `npm test` / `npm run build`: NOT RUN in this runner because `node`, `npm` and `npx` are unavailable.

@@ -1,6 +1,6 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { SupabaseService } from '../../core/supabase/supabase.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { PeriodContextService } from '../../core/services/period-context.service';
@@ -15,7 +15,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge.compo
   standalone: true,
   imports: [FormsModule, RouterLink, StatusBadgeComponent],
   template: `
-    <section class="page-header"><div><p class="eyebrow">LỚP HỌC</p><h1>{{ item()?.name || 'Chi tiết lớp' }}</h1><p class="muted">{{ item()?.code }} · Khối {{ item()?.grade }} · {{ item()?.subject }}</p></div><div><a class="secondary" [routerLink]="['/classes', id, 'schedule']">Lịch học</a><a class="secondary" routerLink="/classes">Danh sách</a>@if(auth.role()==='ADMIN'){<button class="primary" (click)="startEdit()">{{editing?'Đóng sửa':'Sửa lớp'}}</button>}</div></section>
+    <section class="page-header"><div><p class="eyebrow">LỚP HỌC</p><h1>{{ item()?.name || 'Chi tiết lớp' }}</h1><p class="muted">{{ item()?.code }} · Khối {{ item()?.grade }} · {{ item()?.subject }}</p></div><div><a class="secondary" [routerLink]="['/classes', id, 'schedule']">Lịch học</a><a class="secondary" routerLink="/classes">Danh sách</a>@if(auth.role()==='ADMIN'){<button class="primary" (click)="startEdit()">{{editing?'Đóng sửa':'Sửa lớp'}}</button><button class="secondary danger" type="button" [disabled]="deleting()" (click)="deleteClass()">{{deleting()?'Đang xóa…':'Xóa lớp'}}</button>}</div></section>
     @if(error()){<div class="alert">{{error()}}</div>}
     @if(editing&&auth.role()==='ADMIN'){<form class="card form-card" (ngSubmit)="save()"><h2>Chỉnh sửa lớp</h2><div class="form-grid"><label>Mã lớp *<input name="code" [(ngModel)]="form.code" required /></label><label>Tên lớp *<input name="name" [(ngModel)]="form.name" required /></label><label>Khối *<input name="grade" type="number" min="1" max="12" step="1" [(ngModel)]="form.grade" required /></label><label>Môn *<input name="subject" [(ngModel)]="form.subject" required /></label><label>Học phí/buổi *<input name="fee" type="number" min="0" step="1" [(ngModel)]="form.fee" required /></label><label>Cách thu<select name="method" [(ngModel)]="form.method"><option value="PER_SESSION">Theo buổi</option><option value="PREPAID">Thu trước</option></select></label><label>Trạng thái<select name="status" [(ngModel)]="form.status"><option value="ACTIVE">Đang hoạt động</option><option value="INACTIVE">Ngừng hoạt động</option></select></label><label class="full">Ghi chú<textarea name="note" rows="2" [(ngModel)]="form.note"></textarea></label></div><div class="form-actions"><button class="primary">Lưu thay đổi</button><button type="button" class="secondary" (click)="startEdit()">Hủy</button></div></form>}
     <div class="grid-2"><section class="card section-card"><h2>Thông tin</h2><div class="stat-list"><div><span>Học phí</span><strong>{{money(item()?.standard_unit_fee)}}</strong></div><div><span>Cách thu</span><strong>{{item()?.collection_method === 'PREPAID' ? 'Thu trước' : 'Theo buổi'}}</strong></div><div><span>Trạng thái</span><app-status-badge [value]="item()?.status" /></div></div></section><section class="card section-card"><h2>Nhân sự phân công</h2>@for(a of assignments();track a.id){<div class="stat-list"><div><span>{{roleLabel(a.role)}}</span><strong>{{a.staff?.full_name || a.staff_id}} <small class="muted">({{a.staff?.code || '—'}})</small></strong></div></div>}@empty{<p class="muted">Chưa có phân công.</p>}</section></div>
@@ -31,10 +31,11 @@ export class ClassDetailComponent implements OnInit {
   readonly payroll = signal<any[]>([]);
   readonly error = signal('');
   readonly savingEnrollment = signal('');
+  readonly deleting = signal(false);
   editing = false;
   form = { code: '', name: '', grade: 1, subject: 'Toán', fee: 0, method: 'PER_SESSION', status: 'ACTIVE', note: '' };
 
-  constructor(private readonly route: ActivatedRoute, private readonly supabase: SupabaseService, readonly auth: AuthService, readonly period: PeriodContextService, private readonly confirm: ConfirmService, private readonly toast: ToastService) {}
+  constructor(private readonly route: ActivatedRoute, private readonly router: Router, private readonly supabase: SupabaseService, readonly auth: AuthService, readonly period: PeriodContextService, private readonly confirm: ConfirmService, private readonly toast: ToastService) {}
 
   ngOnInit() { this.id = this.route.snapshot.paramMap.get('id') || ''; void this.load(); }
 
@@ -75,6 +76,28 @@ export class ClassDetailComponent implements OnInit {
     if (result.error) this.error.set(this.friendlyError(result.error)); else { this.toast.success('Đã cập nhật lớp.'); this.editing = false; await this.load(); }
   }
 
+  async deleteClass(): Promise<void> {
+    const current = this.item();
+    if (!current || this.deleting()) return;
+    if (!this.confirm.ask(`Xóa lớp ${current.code}? Nếu lớp đã có học sinh, buổi học hoặc dữ liệu tài chính, hệ thống sẽ ngừng hoạt động lớp và giữ nguyên lịch sử.`)) return;
+    this.deleting.set(true);
+    this.error.set('');
+    try {
+      const result = await this.supabase.client.rpc('rpc_delete_class', { p_class_id: this.id });
+      if (result.error) {
+        this.error.set(this.friendlyError(result.error));
+        return;
+      }
+      const action = String((result.data as any)?.action || 'DEACTIVATED');
+      this.toast.success(action === 'DELETED' ? 'Đã xóa lớp.' : 'Lớp đã ngừng hoạt động; lịch sử được giữ nguyên.');
+      await this.router.navigateByUrl('/classes');
+    } catch (error) {
+      this.error.set(this.friendlyError(error));
+    } finally {
+      this.deleting.set(false);
+    }
+  }
+
   async leaveEnrollment(enrollment: any) {
     const enrolledTo = String(enrollment.edit_enrolled_to || '').trim();
     if (!enrolledTo || enrolledTo < enrollment.enrolled_from) { this.error.set('Ngày rời lớp phải từ ngày bắt đầu học trở đi.'); return; }
@@ -92,6 +115,7 @@ export class ClassDetailComponent implements OnInit {
   private friendlyError(error: any) {
     const message = String(error?.message || error || '');
     if (message.includes('CONFLICT') || message.includes('duplicate key')) return 'Mã lớp đã tồn tại trong trung tâm.';
+    if (message.includes('CLASS_NOT_FOUND')) return 'Không tìm thấy lớp hoặc lớp không còn trong phạm vi quyền.';
     if (message.includes('ENROLLMENT_REJOIN_REQUIRED')) return 'Enrollment đã kết thúc; hãy tạo enrollment mới để học sinh quay lại lớp.';
     return message || 'Không thể hoàn tất thao tác.';
   }

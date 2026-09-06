@@ -33,6 +33,12 @@ The supplied operational workbook is validated server-side, stored in the privat
 - Confirmed/paid ledgers and approved payroll are not overwritten by recalculation.
 - No service-role or secret key is referenced by Angular.
 
+## Class deletion
+
+- Class deletion is Admin-only through audited `rpc_delete_class`; direct Data API deletes remain unavailable.
+- An empty class may be physically deleted with its weekly schedules; a class referenced by enrollment, sessions, assignments, rewards, finance, payroll or period snapshots is deactivated instead so history remains intact.
+- Deactivation disables active schedules and non-closed period class configurations, and session generation rejects inactive classes.
+
 ## Rebuild workflow notes (2026-09-06)
 
 - The new Angular route tree is hub-first. Existing detail components remain available behind hub tabs or compatibility paths so class, student, finance, audit and import operations are not discarded during the transition.
