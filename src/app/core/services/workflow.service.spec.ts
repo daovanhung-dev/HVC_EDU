@@ -86,3 +86,18 @@ describe('WorkflowService.teachingSchedule', () => {
     expect(rows[0]).toMatchObject({ source: 'SESSION', id: 'session-6-sunday', session_id: 'session-6-sunday', schedule_id: null, period_id: 'period-2026-09' });
   });
 });
+
+describe('WorkflowService.createMonthSetup', () => {
+  it('sends idempotency in the JSON body so browser CORS preflight succeeds', async () => {
+    const invoke = vi.fn().mockResolvedValue({});
+    const service = new WorkflowService({ client: {} } as any, { invoke } as any);
+
+    await service.createMonthSetup({ period: { year: 2026, month: 9 } });
+
+    expect(invoke).toHaveBeenCalledWith('create-month-setup', {
+      period: { year: 2026, month: 9 },
+      idempotency_key: 'month-setup:2026-9',
+    });
+    expect(invoke.mock.calls[0]?.[2]).toBeUndefined();
+  });
+});

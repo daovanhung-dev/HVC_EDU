@@ -82,7 +82,11 @@ export class WorkflowService {
   }
 
   async createMonthSetup(payload: Record<string, unknown>): Promise<any> {
-    return this.edge.invoke('create-month-setup', payload, `month-setup:${String((payload['period'] as any)?.year)}-${String((payload['period'] as any)?.month)}`);
+    const period = payload['period'] as { year?: unknown; month?: unknown } | undefined;
+    const idempotencyKey = `month-setup:${String(period?.year)}-${String(period?.month)}`;
+    // Supabase's browser gateway does not allow x-idempotency-key in CORS preflight.
+    // Keep the same server-side idempotency guard by sending the key as JSON instead.
+    return this.edge.invoke('create-month-setup', { ...payload, idempotency_key: idempotencyKey });
   }
 
   async teachingSessions(periodId: string, from?: string, to?: string): Promise<TeachingSession[]> {

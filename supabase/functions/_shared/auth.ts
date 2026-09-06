@@ -19,14 +19,21 @@ export function idempotencyKey(request: Request): string | null {
   return value || null;
 }
 
+export function idempotencyKeyFromBody(body: unknown): string | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  const value = (body as Record<string, unknown>).idempotency_key;
+  return typeof value === 'string' ? value.trim() || null : null;
+}
+
 export async function runIdempotent<T>(
   ctx: any,
   centerId: string,
   request: Request,
   operation: string,
   execute: () => Promise<T>,
+  body?: unknown,
 ): Promise<T> {
-  const key = idempotencyKey(request);
+  const key = idempotencyKey(request) ?? idempotencyKeyFromBody(body);
   if (!key) return execute();
   const admin = ctx.supabaseAdmin;
   if (!admin) throw new Error('INTERNAL_ERROR');

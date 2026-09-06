@@ -5,6 +5,7 @@ import { jsonBody, requiredUuid } from '../_shared/validation.ts';
 import { ok } from '../_shared/response.ts';
 
 type Payload = {
+  idempotency_key?: string;
   source_period_id?: string | null;
   period?: Record<string, unknown>;
   class_configs?: unknown[];
@@ -34,7 +35,7 @@ export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any)
       p_carry_over: body.carry_over !== false,
       p_trace_id: traceId,
       p_new_classes: body.new_classes ?? [],
-    }));
+    }), body);
     return finish(request, ok(result, traceId, 201));
   } catch (error) { return errorResponse(error, request, traceId); }
 }) };
