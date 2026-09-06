@@ -1,21 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { NAVIGATION_SECTIONS, canAccessNavigationItem } from './navigation.config';
+import { NAVIGATION_ITEMS, SECONDARY_NAVIGATION, canAccessNavigationItem } from './navigation.config';
 
 describe('navigation configuration', () => {
-  it('exposes the complete function catalog grouped by business area', () => {
-    const items = NAVIGATION_SECTIONS.flatMap((section) => section.items);
-    expect(NAVIGATION_SECTIONS.map((section) => section.id)).toEqual(['overview', 'education', 'finance', 'people', 'reports', 'system']);
-    expect(items.map((item) => item.path)).toContain('/finance/rewards');
-    expect(items.map((item) => item.path)).toContain('/finance/fund-profit');
-    expect(items.length).toBeGreaterThanOrEqual(15);
+  it('exposes the simplified role-based workflow hubs', () => {
+    expect(NAVIGATION_ITEMS.map((item) => item.id)).toEqual([
+      'home', 'months', 'classes', 'students', 'teaching-schedule', 'staff', 'finance', 'work', 'notifications',
+    ]);
+    expect(NAVIGATION_ITEMS.find((item) => item.id === 'finance')?.path).toBe('/finance');
+    expect(SECONDARY_NAVIGATION.map((item) => item.id)).toEqual(['settings', 'account']);
   });
 
-  it('keeps navigation visibility separate from authorization', () => {
-    const settings = NAVIGATION_SECTIONS.flatMap((section) => section.items).find((item) => item.path === '/settings');
-    const attendance = NAVIGATION_SECTIONS.flatMap((section) => section.items).find((item) => item.path === '/attendance');
-    expect(settings && canAccessNavigationItem(settings, 'ADMIN')).toBe(true);
-    expect(settings && canAccessNavigationItem(settings, 'TEACHER')).toBe(false);
-    expect(attendance && canAccessNavigationItem(attendance, 'ASSISTANT')).toBe(true);
-    expect(attendance && canAccessNavigationItem(attendance, 'ACCOUNTANT')).toBe(false);
+  it('keeps role visibility separate from route authorization', () => {
+    const schedule = NAVIGATION_ITEMS.find((item) => item.id === 'teaching-schedule')!;
+    const work = NAVIGATION_ITEMS.find((item) => item.id === 'work')!;
+    const finance = NAVIGATION_ITEMS.find((item) => item.id === 'finance')!;
+    expect(canAccessNavigationItem(schedule, 'ASSISTANT')).toBe(true);
+    expect(canAccessNavigationItem(work, 'TEACHER')).toBe(true);
+    expect(canAccessNavigationItem(finance, 'TEACHER')).toBe(false);
+    expect(canAccessNavigationItem(finance, 'ACCOUNTANT')).toBe(true);
   });
 });

@@ -12,5 +12,12 @@ Run after `supabase start` and `supabase db reset` with two centers and four tes
 8. `DB-T08` — carry/close twice with the same source period and verify one linked `CARRY_IN`/`CARRY_OUT` pair per enrollment.
 9. `DB-T09` — calculate payroll with teacher + assistant and verify each class total is at most `max_total_percent`, with each amount on `rounding_step`.
 10. `DB-T10` — attempt client update/delete on `audit_logs`; verify RLS denies it. Verify role changes contain before/after audit data.
+11. `DB-T11` — call `rpc_create_month_setup` with an invalid assignment after valid period/snapshot/schedule payload; verify no period, snapshot, session, enrollment or assignment remains. Repeat a successful call with the same idempotency key and verify no duplicate month.
+12. `DB-T12` — verify backfilled periods use `LEGACY_ASSIGNMENT`, wizard periods use `APPROVED_WORK_ATTENDANCE`, and tuition/session generation reads `period_class_configs` instead of mutable class master values.
+13. `DB-T13` — verify only an assigned teacher/assistant can check in/out; checkout before check-in fails; checkout creates `SUBMITTED`; Admin approve/reject requires the expected state and rejection reason.
+14. `DB-T14` — verify payroll for an `APPROVED_WORK_ATTENDANCE` period counts only `APPROVED` work rows, while a legacy period still uses the legacy assignment basis. Verify closed periods reject work attendance mutations.
+15. `DB-T15` — verify staff availability is center-scoped and a teacher can write only their own availability. Verify cross-center and non-recipient notification reads are denied.
+16. `DB-T16` — verify Admin manual notification fan-out to ALL/ROLE/USER creates one row per recipient, dedupes by key, and only the recipient can mark/read it.
+17. `DB-T17` — verify payroll pending, close blocker and import error events create recipient-scoped Admin inbox notifications with audit records.
 
 Edge negative-case matrix: for every function call with no JWT, wrong role, malformed body, missing UUID/resource and closed-period mutation. Expected status/error codes are defined in `supabase/functions/_shared/error.ts`.

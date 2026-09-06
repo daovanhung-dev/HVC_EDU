@@ -32,3 +32,12 @@ The supplied operational workbook is validated server-side, stored in the privat
 - Closing carries outstanding debt to the next open period, when one exists, using linked `CARRY_IN`/`CARRY_OUT` adjustments and unique source keys.
 - Confirmed/paid ledgers and approved payroll are not overwritten by recalculation.
 - No service-role or secret key is referenced by Angular.
+
+## Rebuild workflow notes (2026-09-06)
+
+- The new Angular route tree is hub-first. Existing detail components remain available behind hub tabs or compatibility paths so class, student, finance, audit and import operations are not discarded during the transition.
+- `rpc_create_month_setup` is the only final write for the wizard. It generates sessions in the same transaction as the new period and rolls back the whole setup if any class, roster, schedule or assignment validation fails.
+- Existing periods receive `LEGACY_ASSIGNMENT` in `period_settings`; wizard-created periods receive `APPROVED_WORK_ATTENDANCE`. No historical check-in rows are fabricated.
+- Work attendance is per `class_sessions` row and `staff_id`. Direct browser insert/update is not granted; submit/review/availability/notification writes use security-definer RPCs through Edge Functions.
+- Notification reads are recipient-only. Admin fan-out is performed by RPC; automatic admin alerts cover submitted work, payroll pending approval, close blockers and import errors.
+- Remote deployment is intentionally separate from this code change. Apply the additive migration and deploy the new functions before releasing the Angular bundle.

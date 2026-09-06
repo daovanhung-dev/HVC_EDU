@@ -82,3 +82,31 @@ Status: IMPLEMENTED; remote migrations and invite function deployed
 - Staff list/detail show email/account state and expose the invite action only to Admin. `invite-staff-account` links the invited Auth user through an audited RPC and removes the new Auth user if linking fails.
 - Remote: migrations `202609040012_staff_accounts_enrollment.sql` through `202609040016_enrollment_reentry_guard.sql` applied; `invite-staff-account` deployed.
 - Verification: Angular tests 3 files/4 tests PASS; Angular production build PASS; Deno function check PASS; Supabase migration dry-run and remote apply PASS. A real invite delivery test remains intentionally unsent until an approved test recipient is provided.
+
+## STEP 39 — Rebuild workflow tối giản HVC_EDU
+
+Status: IMPLEMENTED IN WORKTREE; DATABASE RUNTIME/REMOTE DEPLOY PENDING
+
+Implemented in the additive migration `supabase/migrations/202609060001_rebuild_workflows.sql`:
+
+- `period_class_configs` and `period_settings` snapshots with legacy payroll backfill.
+- Atomic `rpc_create_month_setup` covering period, class snapshot, schedules, sessions, assignments, enrollment actions, settings and linked carry-over.
+- `staff_work_attendance` with per-session `CHECK_IN`/`CHECK_OUT`, `SUBMITTED`/`APPROVED`/`REJECTED` review path, audit and notifications.
+- `staff_availability` and recipient-scoped `notifications`, manual fan-out and automatic admin alerts.
+- New-period tuition/session functions read period snapshots; new-period payroll reads only approved work attendance; close preview/RPC block unresolved work attendance.
+
+Implemented in Angular:
+
+- Role-based hubs for home, month setup, education, teaching, finance, people, notifications, account and settings.
+- Nine-step browser draft month wizard and one final `create-month-setup` call.
+- Mobile-first teaching cards with check-in/out and links to attendance/evaluation actions.
+- Notification inbox, unread badge, read-all and Admin compose form.
+- Compatibility redirects for legacy finance, payroll, attendance/evaluation, audit, migration, reports and assignment bookmarks.
+
+Verification in this runner:
+
+- `npm ci`: PASS using temporary Node `22.22.3`.
+- `npm test`: PASS, 7 test files / 13 tests.
+- `npm run build`: PASS.
+- `deno check --no-config --node-modules-dir=auto supabase/functions/_shared/*.ts supabase/functions/*/index.ts`: PASS.
+- `supabase db lint` and `supabase db reset`: NOT RUN successfully because local Postgres/Docker runtime is unavailable (`127.0.0.1:54322`, no Docker/Podman). The new migration and functions have not been applied to production in this task.

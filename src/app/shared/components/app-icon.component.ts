@@ -18,6 +18,7 @@ import { Component, Input } from '@angular/core';
         @case ('payroll') { <path d="M4 4h16v16H4z" /><path d="M8 8h8M8 12h8M8 16h5" /> }
         @case ('profit') { <path d="M4 19V9M10 19V5M16 19v-7M22 19H2" /> }
         @case ('people') { <circle cx="9" cy="8" r="3" /><path d="M3 20c.5-3.3 2.5-5 6-5s5.5 1.7 6 5" /><path d="M16 5.5a3 3 0 0 1 0 5.7M18 15c1.8.5 2.8 2.1 3 5" /> }
+        @case ('bell') { <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /> }
         @case ('assignment') { <path d="M5 5h14v15H5z" /><path d="M9 5V3h6v2M8 10h8M8 14h6" /> }
         @case ('chart') { <path d="M4 19V5M4 19h16" /><path d="m7 15 3-4 3 2 5-6" /> }
         @case ('report') { <path d="M5 3h10l4 4v14H5z" /><path d="M15 3v5h4M8 12h8M8 16h6" /> }

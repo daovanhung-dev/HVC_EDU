@@ -6,6 +6,8 @@ export type DashboardTaskCode =
   | 'EVALUATION_PENDING'
   | 'TUITION_LEDGER_PENDING'
   | 'PAYROLL_PENDING_APPROVAL'
+  | 'WORK_ATTENDANCE_PENDING'
+  | 'NOTIFICATIONS_UNREAD'
   | 'INTEGRITY_WARNING';
 
 export type DashboardTask = {
@@ -47,6 +49,8 @@ export type DashboardSummary = {
   role: string;
   tasks: DashboardTask[];
   upcomingSessions: UpcomingSession[];
+  unreadNotificationCount?: number;
+  pendingWorkAttendanceCount?: number;
 };
 
 @Injectable({ providedIn: 'root' })

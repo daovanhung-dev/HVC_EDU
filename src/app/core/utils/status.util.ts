@@ -23,6 +23,12 @@ const STATUS_LABELS: Record<string, string> = {
   ABSENT: 'Vắng',
   EXCUSED: 'Có phép',
   APPROVED: 'Đã duyệt',
+  IN_PROGRESS: 'Đang thực hiện',
+  SUBMITTED: 'Chờ duyệt',
+  REJECTED: 'Bị từ chối',
+  INFO: 'Thông tin',
+  WARNING: 'Cảnh báo',
+  BLOCKED: 'Đang chặn',
   IMPORTED: 'Đã nhập',
   VALIDATING: 'Đang kiểm tra',
   READY: 'Sẵn sàng nhập',
@@ -56,6 +62,7 @@ export function statusTone(value: string | null | undefined): 'positive' | 'warn
     case 'COMPLETED':
     case 'PAID':
     case 'APPROVED':
+    case 'INFO':
     case 'PRESENT':
     case 'READY':
     case 'IMPORTED':
@@ -67,6 +74,9 @@ export function statusTone(value: string | null | undefined): 'positive' | 'warn
     case 'SCHEDULED':
     case 'VALIDATING':
     case 'IMPORTING':
+    case 'IN_PROGRESS':
+    case 'SUBMITTED':
+    case 'WARNING':
       return 'warning';
     case 'INACTIVE':
     case 'CLOSED':
@@ -75,6 +85,8 @@ export function statusTone(value: string | null | undefined): 'positive' | 'warn
     case 'FAILED':
     case 'LOCKED':
     case 'UNPAID':
+    case 'REJECTED':
+    case 'BLOCKED':
     case 'CONFLICT':
     case 'PERIOD_CLOSED':
       return 'danger';

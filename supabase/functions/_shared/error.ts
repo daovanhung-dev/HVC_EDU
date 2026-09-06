@@ -31,6 +31,14 @@ const messages: Record<string, string> = {
   IMPORT_VALIDATION_FAILED: 'Dữ liệu import chưa hợp lệ',
   IDEMPOTENCY_IN_PROGRESS: 'Yêu cầu trùng đang được xử lý, hãy thử lại sau',
   PAYROLL_ALREADY_APPROVED: 'Bảng lương đã được duyệt và bị khóa',
+  SESSION_CANCELLED: 'Buổi học đã bị hủy',
+  WORK_ATTENDANCE_NOT_FOUND: 'Không tìm thấy bản ghi chấm công',
+  WORK_ATTENDANCE_ALREADY_STARTED: 'Buổi học này đã được check-in hoặc gửi công',
+  WORK_ATTENDANCE_CHECK_IN_REQUIRED: 'Cần check-in trước khi check-out',
+  WORK_ATTENDANCE_NOT_SUBMITTED: 'Bản ghi công chưa được gửi để duyệt',
+  SOURCE_PERIOD_NOT_CLOSED: 'Cần đóng kỳ trước trước khi chuyển sang tháng mới',
+  NOTIFICATION_NOT_FOUND: 'Không tìm thấy thông báo',
+  STAFF_AVAILABILITY_INVALID: 'Khung giờ làm việc không hợp lệ',
   CLOSE_PERIOD_BLOCKED: 'Kỳ còn dữ liệu chưa hoàn tất',
   VERSION_CONFLICT: 'Dữ liệu đã thay đổi, hãy tải lại trang',
   NOT_FOUND: 'Không tìm thấy dữ liệu',
@@ -46,7 +54,7 @@ export function errorResponse(error: unknown, request: Request, traceId: string)
     raw.includes('already exists') ? 'CONFLICT' :
     Object.keys(messages).find((key) => raw.includes(key)) ?? 'INTERNAL_ERROR';
   const status = code === 'UNAUTHENTICATED' ? 401 : code === 'FORBIDDEN' || code === 'CLASS_NOT_ASSIGNED' ? 403 :
-    ['NOT_FOUND','CLASS_NOT_FOUND','SESSION_NOT_FOUND','PERIOD_NOT_FOUND','LEDGER_NOT_FOUND','PAYMENT_NOT_FOUND','STAFF_NOT_FOUND','STUDENT_NOT_FOUND','ENROLLMENT_NOT_FOUND','PAYROLL_NOT_FOUND','PAYROLL_POLICY_NOT_FOUND','PROFILE_NOT_FOUND'].includes(code) ? 404 :
-    ['PERIOD_CLOSED','PERIOD_NOT_OPEN','PAYMENT_EXCEEDS_DEBT','PAYMENT_ALREADY_VOIDED','PAYROLL_ALREADY_APPROVED','PAYROLL_CAP_EXCEEDED','VERSION_CONFLICT','CONFLICT','CLOSE_PERIOD_BLOCKED','IMPORT_VALIDATION_FAILED','IDEMPOTENCY_IN_PROGRESS','STAFF_ACCOUNT_EXISTS','ENROLLMENT_REJOIN_REQUIRED'].includes(code) ? 409 : 400;
+    ['NOT_FOUND','CLASS_NOT_FOUND','SESSION_NOT_FOUND','PERIOD_NOT_FOUND','LEDGER_NOT_FOUND','PAYMENT_NOT_FOUND','STAFF_NOT_FOUND','STUDENT_NOT_FOUND','ENROLLMENT_NOT_FOUND','PAYROLL_NOT_FOUND','PAYROLL_POLICY_NOT_FOUND','PROFILE_NOT_FOUND','WORK_ATTENDANCE_NOT_FOUND','NOTIFICATION_NOT_FOUND'].includes(code) ? 404 :
+    ['PERIOD_CLOSED','PERIOD_NOT_OPEN','PAYMENT_EXCEEDS_DEBT','PAYMENT_ALREADY_VOIDED','PAYROLL_ALREADY_APPROVED','PAYROLL_CAP_EXCEEDED','VERSION_CONFLICT','CONFLICT','CLOSE_PERIOD_BLOCKED','IMPORT_VALIDATION_FAILED','IDEMPOTENCY_IN_PROGRESS','STAFF_ACCOUNT_EXISTS','ENROLLMENT_REJOIN_REQUIRED','SOURCE_PERIOD_NOT_CLOSED','WORK_ATTENDANCE_ALREADY_STARTED','WORK_ATTENDANCE_CHECK_IN_REQUIRED','WORK_ATTENDANCE_NOT_SUBMITTED'].includes(code) ? 409 : 400;
   return withCors(fail(status, code, messages[code] ?? messages['INTERNAL_ERROR'], null, traceId), request);
 }

@@ -14,7 +14,7 @@ export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any)
     const { data: period, error: periodError } = await ctx.supabase.from('accounting_periods').select('*').eq('id', periodId).maybeSingle();
     if (periodError) throw periodError;
     if (!period) throw new Error('PERIOD_NOT_FOUND');
-    const [sessions, ledgers, payroll, distributions, finance, enrollments, transactions] = await Promise.all([
+    const [sessions, ledgers, payroll, distributions, finance, enrollments, transactions, periodSettings] = await Promise.all([
       ctx.supabase.from('class_sessions').select('id,status').eq('period_id', periodId).neq('status','CANCELLED'),
       ctx.supabase.from('tuition_ledgers').select('id,enrollment_id,status').eq('period_id', periodId),
       ctx.supabase.from('payroll_runs').select('status,total_amount').eq('period_id', periodId).maybeSingle(),
@@ -22,8 +22,9 @@ export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any)
       ctx.supabase.from('v_finance_period_summary').select('*').eq('period_id', periodId).maybeSingle(),
       ctx.supabase.from('enrollments').select('id,enrolled_from,enrolled_to,status,class:classes!inner(center_id)').eq('status','ACTIVE'),
       ctx.supabase.from('financial_transactions').select('id,transaction_date,type,category,description,amount').eq('period_id', periodId),
+      ctx.supabase.from('period_settings').select('key,value_json').eq('period_id', periodId),
     ]);
-    for (const result of [sessions,ledgers,payroll,distributions,finance,enrollments,transactions]) if (result.error) throw result.error;
+    for (const result of [sessions,ledgers,payroll,distributions,finance,enrollments,transactions,periodSettings]) if (result.error) throw result.error;
     const sessionIds: string[] = (sessions.data ?? []).map((row: any) => String(row.id));
     let markedIds = new Set<string>();
     if (sessionIds.length > 0) {
@@ -41,16 +42,36 @@ export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any)
     if ((ledgers.data ?? []).some((row: any) => row.status === 'DRAFT')) blockers.push('LEDGER_NOT_CONFIRMED');
     if ((transactions.data ?? []).some((row: any) => !row.transaction_date || !row.type || !row.category || !row.description || Number(row.amount) <= 0)) blockers.push('INVALID_TRANSACTION_METADATA');
     if (!payroll.data || payroll.data.status !== 'APPROVED') blockers.push('PAYROLL_NOT_APPROVED');
+    const payrollBasis = String((periodSettings.data ?? []).find((row: any) => row.key === 'payroll_basis')?.value_json ?? '').replace(/^"|"$/g, '');
+    if (payrollBasis === 'APPROVED_WORK_ATTENDANCE' && sessionIds.length) {
+      const workAttendance = await ctx.supabase.from('staff_work_attendance').select('status').in('session_id', sessionIds);
+      if (workAttendance.error) throw workAttendance.error;
+      if ((workAttendance.data ?? []).some((row: any) => ['SUBMITTED', 'IN_PROGRESS', 'REJECTED'].includes(row.status))) blockers.push('WORK_ATTENDANCE_PENDING_APPROVAL');
+    }
     const ratio = (distributions.data ?? []).reduce((sum: number, row: any) => sum + Number(row.ratio ?? 0), 0);
     if ((distributions.data ?? []).length === 0 || Math.abs(ratio - 1) > 0.0001) blockers.push('PROFIT_RATIO_INVALID');
     const financeRow = finance.data as any;
     const payrollTotal = Number(payroll.data?.total_amount ?? financeRow?.payroll ?? 0);
     const profitBeforeFund = Number(financeRow?.tuition_income ?? 0) + Number(financeRow?.other_income ?? 0) - payrollTotal - Number(financeRow?.student_rewards ?? 0) - Number(financeRow?.other_expense ?? 0);
+    const snapshotFund = (periodSettings.data ?? []).find((row: any) => row.key === 'fund')?.value_json;
     const settingClient = ctx.supabaseAdmin ?? ctx.supabase;
-    const fundSetting = await settingClient.from('system_settings').select('value_json').eq('center_id', (period as any).center_id).eq('key', 'fund').maybeSingle();
+    const fundSetting = snapshotFund ? { data: { value_json: snapshotFund }, error: null } : await settingClient.from('system_settings').select('value_json').eq('center_id', (period as any).center_id).eq('key', 'fund').maybeSingle();
     if (fundSetting.error && ctx.supabaseAdmin) throw fundSetting.error;
     const fundPercent = Number(fundSetting.data?.value_json?.fund_percent ?? 0.10);
     const fundContribution = Math.floor(Math.max(0, profitBeforeFund) * fundPercent);
+    if (blockers.length > 0) {
+      const notified = await ctx.supabase.rpc('rpc_publish_admin_notification', {
+        p_type: 'CLOSE_PERIOD_BLOCKED',
+        p_title: 'Chốt tháng đang bị chặn',
+        p_message: `Tháng ${period.month}/${period.year} còn ${blockers.length} điều kiện chưa hoàn tất.`,
+        p_severity: 'BLOCKED',
+        p_action_route: '/periods?tab=manage',
+        p_metadata: { period_id: periodId, blockers },
+        p_dedupe_key: `CLOSE_PERIOD_BLOCKED:${periodId}:${blockers.join('|')}`,
+        p_trace_id: traceId,
+      });
+      if (notified.error) throw notified.error;
+    }
     return finish(request, ok({ period, blockers, can_close: blockers.length === 0, payroll: payroll.data, distributions: distributions.data ?? [], finance: finance.data, ledger_count: ledgers.data?.length ?? 0, profit_before_fund: profitBeforeFund, fund_percent: fundPercent, fund_contribution: fundContribution, distributable_profit: Math.max(0, profitBeforeFund - fundContribution) }, traceId));
   } catch (error) { return errorResponse(error, request, traceId); }
 }) };

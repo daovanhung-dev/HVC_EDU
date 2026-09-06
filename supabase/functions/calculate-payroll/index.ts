@@ -56,6 +56,11 @@ function requireResult<T>(result: { data: T; error: unknown }): T {
   return result.data;
 }
 
+function jsonSetting(value: unknown, fallback: string): string {
+  if (typeof value === 'string') return value.replace(/^"|"$/g, '');
+  return fallback;
+}
+
 export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any) => {
   const traceId = crypto.randomUUID();
   if (request.method === 'OPTIONS') return preflight(request);
@@ -67,7 +72,7 @@ export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any)
     if (!period) throw new Error('PERIOD_NOT_FOUND');
     if (period.status !== 'OPEN') throw new Error('PERIOD_NOT_OPEN');
 
-    const policy = requireResult<any>(await ctx.supabase
+    const masterPolicy = requireResult<any>(await ctx.supabase
       .from('payroll_policies')
       .select('id,name,teacher_percent,assistant_percent,max_total_percent,rounding_step,effective_from,effective_to')
       .lte('effective_from', period.start_date)
@@ -76,13 +81,15 @@ export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any)
       .order('effective_from', { ascending: false })
       .limit(1)
       .maybeSingle());
-    if (!policy) throw new Error('PAYROLL_POLICY_NOT_FOUND');
+    if (!masterPolicy) throw new Error('PAYROLL_POLICY_NOT_FOUND');
 
-    const [enrollmentResult, ledgerResult, sessionResult, assignmentResult] = await Promise.all([
+    const [enrollmentResult, ledgerResult, sessionResult, assignmentResult, basisResult, snapshotPolicyResult] = await Promise.all([
       ctx.supabase.from('enrollments').select('id,class_id').eq('status', 'ACTIVE'),
       ctx.supabase.from('tuition_ledgers').select('enrollment_id,amount_due').eq('period_id', periodId),
-      ctx.supabase.from('class_sessions').select('class_id').eq('period_id', periodId).neq('status', 'CANCELLED'),
+      ctx.supabase.from('class_sessions').select('id,class_id').eq('period_id', periodId).neq('status', 'CANCELLED'),
       ctx.supabase.from('class_assignments').select('class_id,staff_id,role,planned_sessions,start_date,end_date,period_id'),
+      ctx.supabase.from('period_settings').select('value_json').eq('period_id', periodId).eq('key', 'payroll_basis').maybeSingle(),
+      ctx.supabase.from('period_settings').select('value_json').eq('period_id', periodId).eq('key', 'payroll_policy').maybeSingle(),
     ]);
     const enrollments = requireResult<any[]>(enrollmentResult) ?? [];
     const ledgers = requireResult<any[]>(ledgerResult) ?? [];
@@ -91,6 +98,13 @@ export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any)
       (!item.period_id || item.period_id === periodId) &&
       item.start_date <= period.end_date &&
       (!item.end_date || item.end_date >= period.start_date));
+    const basisRow = requireResult<any>(basisResult);
+    const workAttendanceBasis = jsonSetting(basisRow?.value_json, 'LEGACY_ASSIGNMENT');
+    const snapshotPolicyRow = requireResult<any>(snapshotPolicyResult);
+    const snapshotPolicy = snapshotPolicyRow?.value_json;
+    const policy = snapshotPolicy && typeof snapshotPolicy === 'object' && snapshotPolicy.teacher_percent !== undefined && snapshotPolicy.assistant_percent !== undefined
+      ? { ...masterPolicy, ...snapshotPolicy }
+      : masterPolicy;
 
     const enrollmentClass = new Map<string, string>();
     for (const enrollment of enrollments as any[]) enrollmentClass.set(enrollment.id, enrollment.class_id);
@@ -100,7 +114,23 @@ export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any)
       if (classId) classRevenue.set(classId, (classRevenue.get(classId) ?? 0n) + asBigInt(ledger.amount_due));
     }
     const classSessions = new Map<string, number>();
-    for (const session of sessions as any[]) classSessions.set(session.class_id, (classSessions.get(session.class_id) ?? 0) + 1);
+    const sessionClass = new Map<string, string>();
+    for (const session of sessions as any[]) {
+      classSessions.set(session.class_id, (classSessions.get(session.class_id) ?? 0) + 1);
+      sessionClass.set(session.id, session.class_id);
+    }
+    const approvedWorkByStaffClass = new Map<string, number>();
+    let workAttendanceCount = 0;
+    if (workAttendanceBasis === 'APPROVED_WORK_ATTENDANCE' && sessions.length) {
+      const work = requireResult<any[]>(await ctx.supabase.from('staff_work_attendance').select('session_id,staff_id').eq('status', 'APPROVED').in('session_id', sessions.map((item: any) => item.id)));
+      for (const item of work ?? []) {
+        workAttendanceCount += 1;
+        const classId = sessionClass.get(item.session_id);
+        if (!classId) continue;
+        const key = `${item.staff_id}:${classId}`;
+        approvedWorkByStaffClass.set(key, (approvedWorkByStaffClass.get(key) ?? 0) + 1);
+      }
+    }
 
     const teacherPercent = String(policy.teacher_percent);
     const assistantPercent = String(policy.assistant_percent);
@@ -110,7 +140,10 @@ export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any)
     for (const assignment of assignments as any[]) {
       const percent = assignment.role === 'ASSISTANT' ? assistantPercent : teacherPercent;
       const sessionsInClass = classSessions.get(assignment.class_id) ?? 0;
-      const sessionsTaught = Math.max(0, Number(assignment.planned_sessions ?? sessionsInClass));
+      const workCount = approvedWorkByStaffClass.get(`${assignment.staff_id}:${assignment.class_id}`) ?? 0;
+      const sessionsTaught = workAttendanceBasis === 'APPROVED_WORK_ATTENDANCE'
+        ? workCount
+        : Math.max(0, Number(assignment.planned_sessions ?? sessionsInClass));
       const coverage = sessionsInClass > 0 ? { numerator: BigInt(Math.min(sessionsTaught, sessionsInClass)), denominator: BigInt(sessionsInClass) } : { numerator: 1n, denominator: 1n };
       const revenue = classRevenue.get(assignment.class_id) ?? 0n;
       const raw = floorFraction(floorRatio(revenue, percent), coverage.numerator, coverage.denominator);
@@ -147,7 +180,20 @@ export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any)
     const total = items.reduce((sum, item) => sum + asBigInt(item.final_amount), 0n);
     let saved: unknown = null;
     if (!body.dry_run) {
-      saved = await runIdempotent(ctx, profile.center_id, request, 'calculate-payroll', () => callRpc(ctx, 'rpc_save_payroll_run', { p_period_id: periodId, p_items: items, p_trace_id: traceId }));
+      saved = await runIdempotent(ctx, profile.center_id, request, 'calculate-payroll', async () => {
+        const result = await callRpc(ctx, 'rpc_save_payroll_run', { p_period_id: periodId, p_items: items, p_trace_id: traceId });
+        await callRpc(ctx, 'rpc_publish_admin_notification', {
+          p_type: 'PAYROLL_PENDING_APPROVAL',
+          p_title: 'Payroll cần duyệt',
+          p_message: `Payroll tháng ${period.month}/${period.year} đã được tính và đang chờ Admin duyệt.`,
+          p_severity: 'WARNING',
+          p_action_route: '/finance?tab=payroll',
+          p_metadata: { period_id: periodId, payroll_run_id: (result as any)?.payroll_run_id ?? null },
+          p_dedupe_key: `PAYROLL_PENDING_APPROVAL:${periodId}`,
+          p_trace_id: traceId,
+        });
+        return result;
+      });
     }
     return finish(request, ok({
       period_id: periodId,
@@ -155,6 +201,8 @@ export default { fetch: withSupabase({ auth: 'user' }, async (request, ctx: any)
       policy,
       items,
       total_amount: asJsonMoney(total),
+      work_attendance_basis: workAttendanceBasis,
+      approved_work_attendance_count: workAttendanceCount,
       saved,
       payroll_run_id: (saved as any)?.payroll_run_id ?? null,
     }, traceId));

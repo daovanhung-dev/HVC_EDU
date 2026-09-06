@@ -118,3 +118,12 @@ Trong môi trường implementation trước đó không có Docker/Podman nên:
 - Dùng để tránh lặp lại investigation đã biết.
 - Trước khi nói "hiện tại", kiểm tra commit/workflow mới nhất nếu có quyền truy cập GitHub.
 - Nếu HEAD khác snapshot đáng kể, cập nhật file này sau khi hoàn tất task liên quan.
+
+## 9. Rebuild workflow working tree (06/09/2026)
+
+The current working tree contains the additive HVC_EDU workflow rebuild:
+
+- Angular routes are hub-first (`home`, `month-setup`, `education`, `teaching`, `finance`, `people`, `notifications`, `settings`) with legacy redirects.
+- Migration `202609060001_rebuild_workflows.sql` adds period snapshots, per-session staff work attendance, staff availability and recipient-scoped notifications, plus atomic month setup and related RPCs.
+- New Edge Functions cover month setup preview/create, work attendance submit/review, availability and notification inbox/send operations.
+- Angular checks and Deno checks pass with temporary Node 22.22.3; local Supabase lint/reset remains blocked because Docker/Podman/Postgres is unavailable. The new migration/functions are not yet reflected in the remote deployment until an explicit deployment step is run.
