@@ -46,3 +46,4 @@ Các truy vấn đọc qua `MinimalService` nhận diện lỗi JWT/401, refresh
 - Migration `202609060009_root_control_plane.sql` tạo `root_sessions`, `root_login_attempts`, cột audit `actor_login` và RPC service-role cho tạo/khóa Admin.
 - Edge Functions `root-auth` và `root-admin-accounts` đều tắt Supabase JWT verification, nhưng tự kiểm tra Root session trước mọi thao tác quản trị.
 - `scripts/provision-root.sh` sinh PBKDF2 hash từ mật khẩu nhập ẩn và set secret; không chứa credential thật.
+- Remote project `ytixnjosaruvpnlvkesv` đã áp dụng migration `202609060009` và deploy hai function Root; cần chạy provision secret trước khi đăng nhập Root lần đầu.

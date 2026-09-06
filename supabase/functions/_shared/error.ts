@@ -44,9 +44,10 @@ const conflictCodes = new Set(['CONFLICT', 'STAFF_ACCOUNT_EXISTS', 'IDEMPOTENCY_
 export function errorResponse(error: unknown, request: Request, traceId: string): Response {
   const raw = error instanceof Error ? error.message : String(error ?? 'INTERNAL_ERROR');
   const pgCode = typeof error === 'object' && error !== null ? String((error as { code?: unknown }).code ?? '') : '';
+  const knownCode = Object.keys(messages).sort((left, right) => right.length - left.length).find((key) => raw.includes(key));
   const code = pgCode === '23505' || raw.includes('duplicate key') ? 'CONFLICT' :
     pgCode === '23514' || raw.includes('check constraint') ? 'VALIDATION_ERROR' :
-    Object.keys(messages).find((key) => raw.includes(key)) ?? 'INTERNAL_ERROR';
+    knownCode ?? 'INTERNAL_ERROR';
   const status = code === 'UNAUTHENTICATED' || code === 'ROOT_UNAUTHENTICATED' || code === 'ROOT_INVALID_CREDENTIALS' ? 401 : code === 'ROOT_RATE_LIMITED' ? 429 : code === 'ROOT_BACKEND_NOT_CONFIGURED' ? 500 : code === 'FORBIDDEN' || code === 'CLASS_NOT_ASSIGNED' ? 403 :
     notFoundCodes.has(code) ? 404 : conflictCodes.has(code) ? 409 : 400;
   return withCors(fail(status, code, messages[code] ?? messages.INTERNAL_ERROR, null, traceId), request);
