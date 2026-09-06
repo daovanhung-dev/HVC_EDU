@@ -329,6 +329,8 @@ code { padding: 2px 6px; border-radius: 6px; color: #334155; background: #f1f5f9
 .schedule-toolbar label { display: grid; gap: 5px; color: #334155; font-size: .76rem; font-weight: 800; }
 .schedule-toolbar input { min-width: 160px; padding: 8px 9px; }
 .schedule-toolbar > .muted { margin-left: auto; padding-bottom: 9px; font-size: .75rem; }
+.schedule-notice { display: flex; flex-wrap: wrap; gap: 5px 12px; margin-bottom: 18px; padding: 12px 14px; border: 1px solid #fed7aa; border-radius: 10px; color: #92400e; background: #fff7ed; font-size: .78rem; }
+.schedule-notice strong { color: #78350f; }
 .view-toggle { display: inline-flex; gap: 3px; padding: 3px; border-radius: 9px; background: #eef2f7; }
 .view-toggle button { min-height: 34px; padding: 6px 11px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; font-size: .76rem; font-weight: 800; }
 .view-toggle button.active { color: var(--blue); background: #fff; box-shadow: var(--shadow-sm); }
@@ -341,6 +343,7 @@ code { padding: 2px 6px; border-radius: 6px; color: #334155; background: #f1f5f9
 .session-card-meta strong { color: var(--ink); }
 .session-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
 .session-card-actions .secondary, .session-card-actions .primary { min-height: 37px; padding: 7px 10px; font-size: .74rem; }
+.schedule-readonly-note { font-size: .75rem; font-weight: 750; }
 .work-note { margin-left: auto; font-size: .76rem; font-weight: 750; }
 .session-rejection { margin: 0; padding: 9px 11px; border-radius: 9px; color: #991b1b; background: #fef2f2; font-size: .75rem; }
 .notification-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr); align-items: start; gap: 18px; }

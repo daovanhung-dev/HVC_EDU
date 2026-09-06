@@ -51,6 +51,12 @@ The supplied operational workbook is validated server-side, stored in the privat
 - Current classes are derived from active, date-effective `class_assignments`; class/student/session/attendance/evaluation reads remain protected by existing center and assignment-aware RLS.
 - The view shows all accessible session history for the assigned class but only active enrollment/student rows, with no finance or admin mutation surface.
 
+## Teaching schedule fallback
+
+- The teaching schedule reads generated `class_sessions` as the authoritative source for attendance, evaluations and work attendance.
+- When a visible active `class_schedules` row has no generated session in the selected range, Angular renders a `WEEKLY_SCHEDULE` read-only occurrence instead of fabricating a backend session.
+- Weekly occurrences are merged by `(class_id, session_date, start_time)` so a generated session is never duplicated; only real session IDs can reach attendance, evaluation or check-in routes.
+
 ## Rebuild workflow notes (2026-09-06)
 
 - The new Angular route tree is hub-first. Existing detail components remain available behind hub tabs or compatibility paths so class, student, finance, audit and import operations are not discarded during the transition.

@@ -159,3 +159,21 @@ Verification:
 - Admin RPC smoke call rejected an unknown class with `CLASS_NOT_FOUND` without changing data.
 - Remote migration list and `deno check` passed.
 - Angular `npm test` / `npm run build`: NOT RUN in this runner because `node`, `npm` and `npx` are unavailable.
+
+## STEP 43 — Sửa hiển thị lịch dạy chưa sinh session
+
+Status: IMPLEMENTED IN WORKTREE; local quality gates PASS
+
+- Teaching schedule now loads actual `class_sessions` across all periods overlapping the selected day/week, instead of depending on the globally selected latest period.
+- Active effective weekly schedules are materialized as read-only planned cards when a period or generated session is not available; generated sessions always take precedence and receive work-attendance data.
+- Planned cards expose no attendance, evaluation or check-in action and explain that Admin must create the period and generate sessions.
+- Date calculations use UTC date arithmetic so Sunday 06/09/2026 maps to ISO weekday 7 without timezone drift.
+
+Verification:
+
+- Added unit coverage for ISO weekday/range/effective-window helpers and service fallback/deduplication behavior.
+- `git diff --check`: PASS.
+- `npm ci`: PASS using temporary Node 22.22.3; 0 vulnerabilities.
+- `npm test`: PASS, 9 test files / 20 tests.
+- `npm run build`: PASS.
+- `deno check --no-config --node-modules-dir=auto supabase/functions/_shared/*.ts supabase/functions/*/index.ts`: PASS.
