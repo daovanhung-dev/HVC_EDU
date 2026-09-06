@@ -13,6 +13,12 @@ type SetupDraft = {
   class_configs: any[]; enrollment_actions: any[]; schedules: any[]; assignments: any[];
   settings: Record<string, unknown>; carry_over: boolean; new_classes: SetupClass[];
 };
+type RosterGroup = {
+  classId: string;
+  classCode: string;
+  className: string;
+  students: Array<{ student: any; enrollment: any }>;
+};
 
 const steps = ['Tháng', 'Lớp', 'Học sinh', 'Lịch', 'Phân công', 'Lương', 'Kế toán', 'Carry-over', 'Xác nhận'];
 
@@ -31,7 +37,25 @@ const steps = ['Tháng', 'Lớp', 'Học sinh', 'Lịch', 'Phân công', 'Lươn
           @switch(step()) {
             @case(0) { <div class="wizard-heading"><p class="eyebrow">BƯỚC 1 / 9</p><h2>Tháng và khoảng ngày</h2><p class="muted">Kỳ nguồn phải đóng trước khi thực hiện carry-over và tạo tháng mới.</p></div><div class="form-grid"><label>Năm *<input type="number" min="2020" max="2100" [(ngModel)]="draft.year" (ngModelChange)="saveDraft()" /></label><label>Tháng *<input type="number" min="1" max="12" [(ngModel)]="draft.month" (ngModelChange)="saveDraft()" /></label><label>Bắt đầu *<input type="date" [(ngModel)]="draft.start_date" (ngModelChange)="saveDraft()" /></label><label>Kết thúc *<input type="date" [(ngModel)]="draft.end_date" (ngModelChange)="saveDraft()" /></label></div> }
             @case(1) { <div class="wizard-heading"><p class="eyebrow">BƯỚC 2 / 9</p><h2>Lớp học của tháng</h2><p class="muted">Chọn snapshot học phí/cách thu theo tháng; lớp tắt sẽ không sinh session và ledger.</p></div><div class="setup-list">@for(config of draft.class_configs; track config.class_id){<label class="setup-row"><input type="checkbox" [checked]="config.active" (change)="config.active = $any($event.target).checked; saveDraft()" /><span><strong>{{ className(config.class_id) }}</strong><small>{{ classCode(config.class_id) }}</small></span><input class="compact-input" type="number" min="0" [value]="config.unit_fee" (input)="config.unit_fee = +$any($event.target).value; saveDraft()" /><select class="compact-select" [value]="config.collection_method" (change)="config.collection_method = $any($event.target).value; saveDraft()"><option value="PER_SESSION">Theo buổi</option><option value="PREPAID">Thu trước</option></select></label>}@empty{<p class="muted">Chưa có lớp từ snapshot nguồn.</p>}</div><div class="new-class-form"><h3>Thêm lớp mới</h3><div class="form-grid"><label>Mã lớp<input [(ngModel)]="newClass.code" /></label><label>Tên lớp<input [(ngModel)]="newClass.name" /></label><label>Khối<input type="number" min="1" max="12" [(ngModel)]="newClass.grade" /></label><label>Môn<input [(ngModel)]="newClass.subject" /></label><label>Đơn giá<input type="number" min="0" [(ngModel)]="newClass.unit_fee" /></label><label>Cách thu<select [(ngModel)]="newClass.collection_method"><option value="PER_SESSION">Theo buổi</option><option value="PREPAID">Thu trước</option></select></label></div><button class="secondary" type="button" (click)="addClass()">+ Thêm lớp vào draft</button>@for(item of draft.new_classes; track item.code){<span class="badge tone-positive">{{ item.code }} · {{ item.name }}</span>}</div> }
-            @case(2) { <div class="wizard-heading"><p class="eyebrow">BƯỚC 3 / 9</p><h2>Roster học sinh</h2><p class="muted">Mặc định giữ enrollment đang active. LEFT là terminal; re-entry luôn tạo enrollment mới.</p></div><div class="table-wrap"><table><thead><tr><th>Học sinh</th><th>Lớp hiện tại</th><th>Thao tác tháng mới</th><th>Đơn giá override</th></tr></thead><tbody>@for(student of preview?.students ?? []; track student.id){@for(enrollment of activeEnrollments(student); track enrollment.id){<tr><td>{{ student.code }} · {{ student.full_name }}</td><td>{{ classCode(enrollment.class_id) }}</td><td><select [value]="actionFor(enrollment.id)" (change)="setAction(enrollment, $any($event.target).value)"><option value="KEEP">Giữ</option><option value="MOVE">Chuyển lớp</option><option value="LEAVE">Nghỉ</option><option value="REENTRY">Re-entry</option></select></td><td><input class="compact-input" type="number" min="0" [value]="enrollment.unit_price_override ?? ''" (input)="setPrice(enrollment, $any($event.target).value)" /></td></tr>}}@empty{<tr><td colspan="4" class="empty">Không có enrollment active trong snapshot nguồn.</td></tr>}</tbody></table></div> }
+            @case(2) {
+              <div class="wizard-heading"><p class="eyebrow">BƯỚC 3 / 9</p><h2>Roster học sinh</h2><p class="muted">Mặc định giữ enrollment đang active. LEFT là terminal; re-entry luôn tạo enrollment mới.</p></div>
+              @if (rosterGroups().length) {
+                <div class="roster-groups">
+                  @for (group of rosterGroups(); track group.classId) {
+                    <section class="roster-group">
+                      <div class="roster-group-heading"><div><p class="eyebrow">LỚP HỌC</p><h3>{{ group.classCode }} · {{ group.className }}</h3></div><span class="badge tone-neutral">{{ group.students.length }} học sinh</span></div>
+                      <div class="table-wrap"><table><thead><tr><th>Học sinh</th><th>Lớp hiện tại</th><th>Thao tác tháng mới</th><th>Đơn giá override</th></tr></thead><tbody>
+                        @for (row of group.students; track row.enrollment.id) {
+                          <tr><td>{{ row.student.code }} · {{ row.student.full_name }}</td><td>{{ group.classCode }}</td><td><select [value]="actionFor(row.enrollment.id)" (change)="setAction(row.enrollment, $any($event.target).value)"><option value="KEEP">Giữ</option><option value="MOVE">Chuyển lớp</option><option value="LEAVE">Nghỉ</option><option value="REENTRY">Re-entry</option></select></td><td><input class="compact-input" type="number" min="0" [value]="row.enrollment.unit_price_override ?? ''" (input)="setPrice(row.enrollment, $any($event.target).value)" /></td></tr>
+                        }
+                      </tbody></table></div>
+                    </section>
+                  }
+                </div>
+              } @else {
+                <div class="empty">Không có enrollment active trong snapshot nguồn.</div>
+              }
+            }
             @case(3) { <div class="wizard-heading"><p class="eyebrow">BƯỚC 4 / 9</p><h2>Copy và chỉnh lịch</h2><p class="muted">Lịch được gắn effective date của tháng mới và session sẽ sinh sau khi tạo kỳ.</p></div><div class="setup-list">@for(schedule of draft.schedules; track schedule.id){<label class="setup-row"><input type="checkbox" [checked]="schedule.active" (change)="schedule.active = $any($event.target).checked; saveDraft()" /><span><strong>{{ classCode(schedule.class_id) }}</strong><small>Thứ {{ schedule.weekday }} · {{ schedule.start_time || 'cả ngày' }} – {{ schedule.end_time || '—' }}</small></span><span class="muted">{{ schedule.effective_from }} → {{ schedule.effective_to || draft.end_date }}</span></label>}@empty{<p class="muted">Chưa có lịch nguồn. Có thể thêm lịch sau trong chi tiết lớp.</p>}</div> }
             @case(4) { <div class="wizard-heading"><p class="eyebrow">BƯỚC 5 / 9</p><h2>Giáo viên và trợ giảng</h2><p class="muted">Chỉ nhân sự active và role khớp staff type mới được tạo assignment.</p></div><div class="setup-list">@for(item of draft.assignments; track item.id){<div class="setup-row"><span><strong>{{ staffName(item.staff_id) }}</strong><small>{{ classCode(item.class_id) }} · {{ item.role === 'ASSISTANT' ? 'Trợ giảng' : 'Giáo viên chính' }}</small></span><input class="compact-input" type="number" min="0" [value]="item.planned_sessions ?? ''" (input)="item.planned_sessions = $any($event.target).value ? +$any($event.target).value : null; saveDraft()" /></div>}@empty{<p class="muted">Chưa có phân công nguồn.</p>}</div> }
             @case(5) { <div class="wizard-heading"><p class="eyebrow">BƯỚC 6 / 9</p><h2>Policy lương</h2><p class="muted">Tháng mới dùng basis APPROVED_WORK_ATTENDANCE. Payroll không tính dựa trên kế hoạch chưa được duyệt.</p></div><div class="policy-callout"><strong>APPROVED_WORK_ATTENDANCE</strong><span>GV/TG check-in/out theo buổi → SUBMITTED → Admin duyệt → payroll.</span></div> }
@@ -68,6 +92,23 @@ export class MonthSetupComponent implements OnInit {
   classCode(id: string): string { return this.preview?.classes.find((item: any) => item.id === id)?.code ?? id.slice(0, 8); }
   staffName(id: string): string { const row = (this.preview?.assignments ?? []).find((item: any) => item.staff_id === id); return row?.staff?.full_name ?? id.slice(0, 8); }
   activeEnrollments(student: any): any[] { return (student.enrollments ?? []).filter((item: any) => item.status === 'ACTIVE'); }
+  rosterGroups(): RosterGroup[] {
+    const groups = new Map<string, RosterGroup>();
+    for (const student of this.preview?.students ?? []) {
+      for (const enrollment of this.activeEnrollments(student)) {
+        const classId = enrollment.class_id;
+        let group = groups.get(classId);
+        if (!group) {
+          group = { classId, classCode: this.classCode(classId), className: this.className(classId), students: [] };
+          groups.set(classId, group);
+        }
+        group.students.push({ student, enrollment });
+      }
+    }
+    return [...groups.values()]
+      .sort((left, right) => left.classCode.localeCompare(right.classCode, 'vi', { numeric: true }))
+      .map((group) => ({ ...group, students: [...group.students].sort((left, right) => left.student.code.localeCompare(right.student.code, 'vi', { numeric: true })) }));
+  }
   actionFor(enrollmentId: string): EnrollmentAction { return this.draft.enrollment_actions.find((item) => item.source_enrollment_id === enrollmentId)?.action ?? 'KEEP'; }
   setAction(enrollment: any, action: EnrollmentAction): void { const row = this.draft.enrollment_actions.find((item) => item.source_enrollment_id === enrollment.id); if (row) row.action = action; else this.draft.enrollment_actions.push({ action, student_id: '', class_id: enrollment.class_id, source_enrollment_id: enrollment.id }); this.saveDraft(); }
   setPrice(enrollment: any, value: string): void { const row = this.draft.enrollment_actions.find((item) => item.source_enrollment_id === enrollment.id); if (row) row.unit_price_override = value ? Number(value) : null; this.saveDraft(); }

@@ -315,6 +315,14 @@ code { padding: 2px 6px; border-radius: 6px; color: #334155; background: #f1f5f9
 .setup-row strong { font-size: .82rem; }
 .setup-row small { margin-top: 3px; color: var(--muted); font-size: .72rem; }
 .compact-input, .compact-select { min-width: 0 !important; width: 100%; padding: 7px 8px; font-size: .76rem; }
+.roster-groups { display: grid; gap: 16px; }
+.roster-group { overflow: hidden; border: 1px solid #e8edf4; border-radius: 13px; background: #fbfdff; }
+.roster-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 16px; border-bottom: 1px solid #e8edf4; background: #f8fafc; }
+.roster-group-heading .eyebrow { margin-bottom: 5px; }
+.roster-group-heading h3 { margin: 0; font-size: .95rem; }
+.roster-group .table-wrap { background: #fff; }
+.roster-group table { min-width: 760px; }
+.roster-group tbody tr:last-child td { border-bottom: 0; }
 .new-class-form { display: grid; gap: 12px; margin-top: 22px; padding-top: 18px; border-top: 1px solid #eef2f7; }
 .new-class-form h3 { margin: 0; font-size: .9rem; }
 .new-class-form .badge { margin-right: 5px; }
@@ -442,6 +450,7 @@ code { padding: 2px 6px; border-radius: 6px; color: #334155; background: #f1f5f9
   .toolbar input, .toolbar select { min-width: 0; }
   .error-state { align-items: flex-start; flex-direction: column; }
   .error-state .secondary { width: 100%; }
+  .roster-group-heading { align-items: flex-start; flex-direction: column; }
   .toast-stack { right: 12px; bottom: 12px; left: 12px; }
   .toast { min-width: 0; max-width: none; }
 }
