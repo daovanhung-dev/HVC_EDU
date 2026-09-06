@@ -3,6 +3,7 @@
 | Nhóm | Nguồn chính | Thực hiện |
 |---|---|---|
 | Auth/role | `auth.service.ts`, `role.guard.ts`, `profiles` | ADMIN và STAFF; Staff không có finance/master-data |
+| Root account control-plane | `root-auth`, `root-admin-accounts`, `root_sessions`, `/root/admins` | Root login riêng, tạo/khóa Admin, không bypass dữ liệu vận hành |
 | Lớp/học sinh | `minimal.service.ts`, `admin-master-data`, RPC upsert | CRUD Admin, đọc theo assignment, deactivate giữ lịch sử |
 | Lịch/buổi | `class_schedules`, `class_sessions`, `generate-class-sessions` | Lịch tuần; sinh session idempotent theo lớp/ngày/giờ |
 | Điểm danh | `attendance-session.component.ts`, `attendance-bulk-upsert` | Enrollment phải thuộc lớp và hiệu lực tại ngày session |
@@ -15,4 +16,4 @@
 
 ## Loại khỏi sản phẩm
 
-Kỳ tháng, học phí, payment/công nợ, payroll, carry-over, quỹ/lợi nhuận, import Excel, báo cáo chi tiết, notification và các màn hình audit đã bị loại khỏi route, source và remote Edge Function. Các migration lịch sử cũ vẫn được giữ nguyên; migration `202609060005` dựng lại schema tối giản, `202609060006` dọn object legacy, `202609060007` siết tenant scope và `202609060008` giới hạn Dashboard Staff.
+Kỳ tháng, học phí, payment/công nợ, payroll, carry-over, quỹ/lợi nhuận, import Excel, báo cáo chi tiết, notification và các màn hình audit đã bị loại khỏi route, source và remote Edge Function. Các migration lịch sử cũ vẫn được giữ nguyên; migration `202609060005` dựng lại schema tối giản, `202609060006` dọn object legacy, `202609060007` siết tenant scope, `202609060008` giới hạn Dashboard Staff và `202609060009` thêm Root control-plane.

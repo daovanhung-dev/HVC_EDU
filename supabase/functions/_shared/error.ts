@@ -14,6 +14,7 @@ const messages: Record<string, string> = {
   STAFF_ACCOUNT_EXISTS: 'Nhân sự đã có tài khoản hoặc tài khoản đã được liên kết',
   STAFF_ACCOUNT_INVITE_FAILED: 'Không thể gửi lời mời tài khoản Staff',
   EMAIL_INVALID: 'Email không hợp lệ',
+  ADMIN_ACCOUNT_INVITE_FAILED: 'Không thể gửi lời mời tài khoản Admin',
   ASSIGNMENT_NOT_FOUND: 'Không tìm thấy phân công',
   SCHEDULE_NOT_FOUND: 'Không tìm thấy lịch học',
   ENROLLMENT_NOT_FOUND: 'Không tìm thấy enrollment',
@@ -23,6 +24,14 @@ const messages: Record<string, string> = {
   IDEMPOTENCY_IN_PROGRESS: 'Yêu cầu trùng đang được xử lý, hãy thử lại sau',
   NOT_FOUND: 'Không tìm thấy dữ liệu',
   INTERNAL_ERROR: 'Không thể hoàn tất thao tác',
+  ROOT_INVALID_CREDENTIALS: 'Tên tài khoản hoặc mật khẩu không đúng',
+  ROOT_RATE_LIMITED: 'Tài khoản Root đang bị tạm khóa do đăng nhập sai quá nhiều lần',
+  ROOT_UNAUTHENTICATED: 'Phiên Root không hợp lệ hoặc đã hết hạn',
+  ROOT_BACKEND_NOT_CONFIGURED: 'Hệ thống Root chưa được cấu hình đầy đủ',
+  ADMIN_AUTH_USER_NOT_FOUND: 'Không tìm thấy tài khoản Auth của Admin',
+  ADMIN_ACCOUNT_EXISTS: 'Tài khoản Admin đã tồn tại',
+  ADMIN_NOT_FOUND: 'Không tìm thấy tài khoản Admin',
+  CENTER_NOT_FOUND: 'Không tìm thấy center hoạt động',
 };
 
 const notFoundCodes = new Set([
@@ -30,7 +39,7 @@ const notFoundCodes = new Set([
   'ASSIGNMENT_NOT_FOUND', 'SCHEDULE_NOT_FOUND', 'ENROLLMENT_NOT_FOUND', 'NOT_FOUND',
 ]);
 
-const conflictCodes = new Set(['CONFLICT', 'STAFF_ACCOUNT_EXISTS', 'IDEMPOTENCY_IN_PROGRESS']);
+const conflictCodes = new Set(['CONFLICT', 'STAFF_ACCOUNT_EXISTS', 'IDEMPOTENCY_IN_PROGRESS', 'ADMIN_ACCOUNT_EXISTS']);
 
 export function errorResponse(error: unknown, request: Request, traceId: string): Response {
   const raw = error instanceof Error ? error.message : String(error ?? 'INTERNAL_ERROR');
@@ -38,7 +47,7 @@ export function errorResponse(error: unknown, request: Request, traceId: string)
   const code = pgCode === '23505' || raw.includes('duplicate key') ? 'CONFLICT' :
     pgCode === '23514' || raw.includes('check constraint') ? 'VALIDATION_ERROR' :
     Object.keys(messages).find((key) => raw.includes(key)) ?? 'INTERNAL_ERROR';
-  const status = code === 'UNAUTHENTICATED' ? 401 : code === 'FORBIDDEN' || code === 'CLASS_NOT_ASSIGNED' ? 403 :
+  const status = code === 'UNAUTHENTICATED' || code === 'ROOT_UNAUTHENTICATED' || code === 'ROOT_INVALID_CREDENTIALS' ? 401 : code === 'ROOT_RATE_LIMITED' ? 429 : code === 'ROOT_BACKEND_NOT_CONFIGURED' ? 500 : code === 'FORBIDDEN' || code === 'CLASS_NOT_ASSIGNED' ? 403 :
     notFoundCodes.has(code) ? 404 : conflictCodes.has(code) ? 409 : 400;
   return withCors(fail(status, code, messages[code] ?? messages.INTERNAL_ERROR, null, traceId), request);
 }

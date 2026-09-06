@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { guestGuard } from './core/guards/guest.guard';
 import { roleGuard } from './core/guards/role.guard';
+import { rootGuard } from './core/guards/root.guard';
 
 const all = ['ADMIN', 'STAFF'];
 const admin = ['ADMIN'];
@@ -9,6 +10,7 @@ const admin = ['ADMIN'];
 export const routes: Routes = [
   { path: 'login', canActivate: [guestGuard], loadComponent: () => import('./features/auth/login.component').then((m) => m.LoginComponent) },
   { path: 'reset-password', loadComponent: () => import('./features/auth/reset-password.component').then((m) => m.ResetPasswordComponent) },
+  { path: 'root/admins', canActivate: [rootGuard], loadComponent: () => import('./features/root/root-admins.component').then((m) => m.RootAdminsComponent) },
   {
     path: '',
     canActivate: [authGuard],

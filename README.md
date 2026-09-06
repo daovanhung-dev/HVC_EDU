@@ -28,6 +28,7 @@ Migration mới không sửa lịch sử migration cũ:
 - `supabase/migrations/202609060006_remove_legacy_objects.sql`: xóa bảng/type legacy còn sót.
 - `supabase/migrations/202609060007_tenant_guards.sql`: siết tenant scope cho các RPC cập nhật theo ID.
 - `supabase/migrations/202609060008_dashboard_staff_scope.sql`: giới hạn số liệu nhân sự trên Dashboard Staff.
+- `supabase/migrations/202609060009_root_control_plane.sql`: session Root, rate-limit và RPC quản trị tài khoản Admin.
 
 Target seed cố định là Supabase project `ytixnjosaruvpnlvkesv`. Sau khi đã backup data-only ngoài repository, chạy:
 
@@ -37,11 +38,32 @@ bash scripts/reset-and-seed-master-data.sh
 
 Script dùng Storage API để xóa object trong `center-imports`, giữ bucket, sau đó giữ Admin/center `HC`, xóa dữ liệu vận hành cũ và seed 4 lớp, 50 học sinh, 5 nhân sự, 50 enrollment, 8 lịch tuần và 8 phân công. Seed không tạo session, attendance, evaluation, chấm công hoặc thu chi.
 
+Để đồng bộ an toàn từ Markdown mà không xóa dữ liệu ngoài nguồn, dùng:
+
+```bash
+bash scripts/sync-master-data.sh --dry-run
+bash scripts/sync-master-data.sh
+```
+
+Sync dùng advisory lock và transaction, upsert theo mã, giữ enrollment/lịch sử/dữ liệu vận hành ngoài nguồn, không đụng Storage hoặc auth. Enrollment mới dùng ngày hiệu lực `2026-09-01`; conflict học sinh đang active ở lớp khác sẽ rollback toàn bộ.
+
 ## Edge Functions
 
-`health`, `dashboard-summary`, `admin-master-data`, `generate-class-sessions`, `attendance-bulk-upsert`, `evaluation-bulk-upsert`, `staff-attendance`, `invite-staff-account`, `record-financial-transaction`.
+`health`, `dashboard-summary`, `admin-master-data`, `generate-class-sessions`, `attendance-bulk-upsert`, `evaluation-bulk-upsert`, `staff-attendance`, `invite-staff-account`, `record-financial-transaction`, `root-auth`, `root-admin-accounts`.
 
 Mutation đi theo đường `Angular → Edge Function → RPC transaction → audit_logs`; RLS giới hạn Staff theo assignment và cấm Staff đọc finance/quản lý master data.
+
+## Root control plane
+
+Root đăng nhập bằng username cố định `admin` qua Edge Function `root-auth`, không qua Supabase Auth ở browser. Session Root là token opaque ngắn hạn lưu trong `sessionStorage`; mật khẩu chỉ được lưu dưới dạng PBKDF2 hash trong Edge Function Secrets.
+
+Provision secret một lần bằng terminal, không ghi mật khẩu vào repository:
+
+```bash
+bash scripts/provision-root.sh
+```
+
+Root chỉ quản lý tài khoản Admin qua `/root/admins`. Admin mới được mời bằng email qua Supabase Admin API và vẫn đăng nhập ứng dụng vận hành bằng Supabase Auth. Root không được mở quyền Data API hoặc bypass tenant isolation của dữ liệu vận hành.
 
 ## Kiểm thử
 

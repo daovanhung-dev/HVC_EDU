@@ -53,3 +53,9 @@ verify_jwt = true
 
 [functions.record-financial-transaction]
 verify_jwt = true
+
+[functions.root-auth]
+verify_jwt = false
+
+[functions.root-admin-accounts]
+verify_jwt = false

@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
+import { ApiError } from '../api/api-error';
 import { EdgeFunctionService } from '../api/edge-function.service';
+import { AuthService } from '../auth/auth.service';
 import { SupabaseService } from '../supabase/supabase.service';
 
 export type EntityStatus = 'ACTIVE' | 'INACTIVE';
@@ -65,56 +67,110 @@ export type DashboardSummary = { from_date: string; to_date: string; active_clas
 
 @Injectable({ providedIn: 'root' })
 export class MinimalService {
-  constructor(private readonly supabase: SupabaseService, private readonly edge: EdgeFunctionService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly edge: EdgeFunctionService,
+    private readonly auth: AuthService,
+  ) {}
 
-  private value<T>(result: { data: T; error: unknown }): T {
+  private async read<T>(query: () => PromiseLike<{ data: T; error: unknown }>): Promise<T> {
+    let result = await query();
+    if (this.isAuthFailure(result.error)) {
+      try {
+        const refreshed = await this.auth.refreshAccessToken();
+        if (!refreshed) return this.expireSession();
+      } catch {
+        return this.expireSession();
+      }
+      result = await query();
+      if (this.isAuthFailure(result.error)) return this.expireSession();
+    }
+    if (this.isForbidden(result.error)) {
+      throw new ApiError({ code: 'FORBIDDEN', message: 'Bạn không có quyền xem dữ liệu này.', details: result.error });
+    }
     if (result.error) throw result.error;
     return result.data;
   }
 
+  private async expireSession(): Promise<never> {
+    await this.auth.expireSession();
+    throw new ApiError({ code: 'AUTH_SESSION_EXPIRED', message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
+  }
+
+  private isAuthFailure(error: unknown): boolean {
+    const status = this.errorStatus(error);
+    const code = this.errorProperty(error, 'code');
+    const message = this.errorProperty(error, 'message').toLowerCase();
+    return status === 401
+      || code === 'PGRST301'
+      || code === 'PGRST302'
+      || /invalid.*jwt|jwt.*(expired|invalid)|token.*(expired|invalid)/i.test(message);
+  }
+
+  private isForbidden(error: unknown): boolean {
+    return this.errorStatus(error) === 403 || this.errorProperty(error, 'code') === '42501';
+  }
+
+  private errorStatus(error: unknown): number | null {
+    if (!error || typeof error !== 'object' || !('status' in error)) return null;
+    const status = Number((error as { status?: unknown }).status);
+    return Number.isFinite(status) ? status : null;
+  }
+
+  private errorProperty(error: unknown, property: 'code' | 'message'): string {
+    if (!error || typeof error !== 'object' || !(property in error)) return '';
+    const value = (error as Record<string, unknown>)[property];
+    return typeof value === 'string' ? value : '';
+  }
+
   async listClasses(includeInactive = false): Promise<CenterClass[]> {
-    let query = this.supabase.client.from('classes').select('id,code,name,grade,subject,note,status').order('code');
-    if (!includeInactive) query = query.eq('status', 'ACTIVE');
-    return this.value(await query) as CenterClass[];
+    return await this.read(() => {
+      let query = this.supabase.client.from('classes').select('id,code,name,grade,subject,note,status').order('code');
+      if (!includeInactive) query = query.eq('status', 'ACTIVE');
+      return query;
+    }) as unknown as CenterClass[];
   }
 
   async listStudents(includeInactive = false): Promise<Student[]> {
-    let query = this.supabase.client.from('students').select('id,code,full_name,phone,parent_name,parent_phone,note,status,enrollments(id,student_id,class_id,enrolled_from,enrolled_to,status,class:classes(id,code,name))').order('code');
-    if (!includeInactive) query = query.eq('status', 'ACTIVE');
-    return this.value(await query) as unknown as Student[];
+    return await this.read(() => {
+      let query = this.supabase.client.from('students').select('id,code,full_name,phone,parent_name,parent_phone,note,status,enrollments(id,student_id,class_id,enrolled_from,enrolled_to,status,class:classes(id,code,name))').order('code');
+      if (!includeInactive) query = query.eq('status', 'ACTIVE');
+      return query;
+    }) as unknown as Student[];
   }
 
   async listStaff(includeInactive = false): Promise<Staff[]> {
-    let query = this.supabase.client.from('staff').select('id,code,full_name,staff_type,phone,email,note,status').order('code');
-    if (!includeInactive) query = query.eq('status', 'ACTIVE');
-    return this.value(await query) as Staff[];
+    return await this.read(() => {
+      let query = this.supabase.client.from('staff').select('id,code,full_name,staff_type,phone,email,note,status').order('code');
+      if (!includeInactive) query = query.eq('status', 'ACTIVE');
+      return query;
+    }) as unknown as Staff[];
   }
 
   async classDetail(classId: string): Promise<{ item: CenterClass; schedules: Schedule[]; assignments: Assignment[]; enrollments: Enrollment[]; sessions: ClassSession[] }> {
     const [item, schedules, assignments, enrollments, sessions] = await Promise.all([
-      this.supabase.client.from('classes').select('id,code,name,grade,subject,note,status').eq('id', classId).maybeSingle(),
-      this.supabase.client.from('class_schedules').select('id,class_id,weekday,start_time,end_time,active').eq('class_id', classId).order('weekday').order('start_time'),
-      this.supabase.client.from('class_assignments').select('id,class_id,staff_id,role,start_date,end_date,active,staff:staff(id,code,full_name,staff_type)').eq('class_id', classId).order('active', { ascending: false }).order('start_date'),
-      this.supabase.client.from('enrollments').select('id,student_id,class_id,enrolled_from,enrolled_to,status,student:students(id,code,full_name,phone,parent_name,parent_phone)').eq('class_id', classId).order('status').order('enrolled_from'),
-      this.supabase.client.from('class_sessions').select('id,class_id,session_date,start_time,end_time,status,note').eq('class_id', classId).order('session_date', { ascending: false }).order('start_time', { ascending: false }).limit(100),
+      this.read(() => this.supabase.client.from('classes').select('id,code,name,grade,subject,note,status').eq('id', classId).maybeSingle()),
+      this.read(() => this.supabase.client.from('class_schedules').select('id,class_id,weekday,start_time,end_time,active').eq('class_id', classId).order('weekday').order('start_time')),
+      this.read(() => this.supabase.client.from('class_assignments').select('id,class_id,staff_id,role,start_date,end_date,active,staff:staff(id,code,full_name,staff_type)').eq('class_id', classId).order('active', { ascending: false }).order('start_date')),
+      this.read(() => this.supabase.client.from('enrollments').select('id,student_id,class_id,enrolled_from,enrolled_to,status,student:students(id,code,full_name,phone,parent_name,parent_phone)').eq('class_id', classId).order('status').order('enrolled_from')),
+      this.read(() => this.supabase.client.from('class_sessions').select('id,class_id,session_date,start_time,end_time,status,note').eq('class_id', classId).order('session_date', { ascending: false }).order('start_time', { ascending: false }).limit(100)),
     ]);
-    const centerClass = this.value(item) as CenterClass | null;
+    const centerClass = item as unknown as CenterClass | null;
     if (!centerClass) throw new Error('CLASS_NOT_FOUND');
-    return { item: centerClass, schedules: this.value(schedules) as unknown as Schedule[], assignments: this.value(assignments) as unknown as Assignment[], enrollments: this.value(enrollments) as unknown as Enrollment[], sessions: this.value(sessions) as unknown as ClassSession[] };
+    return { item: centerClass, schedules: schedules as unknown as Schedule[], assignments: assignments as unknown as Assignment[], enrollments: enrollments as unknown as Enrollment[], sessions: sessions as unknown as ClassSession[] };
   }
 
   async sessionRoster(sessionId: string): Promise<{ session: ClassSession; attendance: AttendanceRow[]; evaluations: EvaluationRow[] }> {
-    const sessionResult = await this.supabase.client.from('class_sessions').select('id,class_id,session_date,start_time,end_time,status,note,class:classes(id,code,name)').eq('id', sessionId).maybeSingle();
-    const session = this.value(sessionResult) as ClassSession | null;
+    const session = await this.read(() => this.supabase.client.from('class_sessions').select('id,class_id,session_date,start_time,end_time,status,note,class:classes(id,code,name)').eq('id', sessionId).maybeSingle()) as unknown as ClassSession | null;
     if (!session) throw new Error('SESSION_NOT_FOUND');
     const [enrollmentResult, attendanceResult, evaluationResult] = await Promise.all([
-      this.supabase.client.from('enrollments').select('id,student:students(id,code,full_name)').eq('class_id', session.class_id).eq('status', 'ACTIVE').order('id'),
-      this.supabase.client.from('attendance').select('enrollment_id,status,note').eq('session_id', sessionId),
-      this.supabase.client.from('student_evaluations').select('enrollment_id,comment').eq('session_id', sessionId),
+      this.read(() => this.supabase.client.from('enrollments').select('id,student:students(id,code,full_name)').eq('class_id', session.class_id).eq('status', 'ACTIVE').order('id')),
+      this.read(() => this.supabase.client.from('attendance').select('enrollment_id,status,note').eq('session_id', sessionId)),
+      this.read(() => this.supabase.client.from('student_evaluations').select('enrollment_id,comment').eq('session_id', sessionId)),
     ]);
-    const enrollments = this.value(enrollmentResult) as unknown as Array<{ id: string; student: Pick<Student, 'id' | 'code' | 'full_name'> }>;
-    const attendanceByEnrollment = new Map((this.value(attendanceResult) as Array<{ enrollment_id: string; status: AttendanceStatus; note: string | null }>).map((row) => [row.enrollment_id, row]));
-    const evaluationByEnrollment = new Map((this.value(evaluationResult) as Array<{ enrollment_id: string; comment: string | null }>).map((row) => [row.enrollment_id, row]));
+    const enrollments = enrollmentResult as unknown as Array<{ id: string; student: Pick<Student, 'id' | 'code' | 'full_name'> }>;
+    const attendanceByEnrollment = new Map((attendanceResult as unknown as Array<{ enrollment_id: string; status: AttendanceStatus; note: string | null }>).map((row) => [row.enrollment_id, row]));
+    const evaluationByEnrollment = new Map((evaluationResult as unknown as Array<{ enrollment_id: string; comment: string | null }>).map((row) => [row.enrollment_id, row]));
     return {
       session,
       attendance: enrollments.map((row) => ({ enrollment_id: row.id, student: row.student, status: attendanceByEnrollment.get(row.id)?.status ?? 'PRESENT', note: attendanceByEnrollment.get(row.id)?.note ?? '' })),
@@ -123,20 +179,23 @@ export class MinimalService {
   }
 
   async listSessions(fromDate: string, toDate: string, classId?: string): Promise<ClassSession[]> {
-    let query = this.supabase.client.from('class_sessions').select('id,class_id,session_date,start_time,end_time,status,note,class:classes(id,code,name)').gte('session_date', fromDate).lte('session_date', toDate).order('session_date').order('start_time');
-    if (classId) query = query.eq('class_id', classId);
-    return this.value(await query) as unknown as ClassSession[];
+    return await this.read(() => {
+      let query = this.supabase.client.from('class_sessions').select('id,class_id,session_date,start_time,end_time,status,note,class:classes(id,code,name)').gte('session_date', fromDate).lte('session_date', toDate).order('session_date').order('start_time');
+      if (classId) query = query.eq('class_id', classId);
+      return query;
+    }) as unknown as ClassSession[];
   }
 
   async listStaffAttendance(fromDate: string, toDate: string, staffId?: string): Promise<StaffAttendance[]> {
-    let query = this.supabase.client.from('staff_attendance').select('id,staff_id,attendance_date,status,note,staff:staff(code,full_name)').gte('attendance_date', fromDate).lte('attendance_date', toDate).order('attendance_date', { ascending: false });
-    if (staffId) query = query.eq('staff_id', staffId);
-    return this.value(await query) as unknown as StaffAttendance[];
+    return await this.read(() => {
+      let query = this.supabase.client.from('staff_attendance').select('id,staff_id,attendance_date,status,note,staff:staff(code,full_name)').gte('attendance_date', fromDate).lte('attendance_date', toDate).order('attendance_date', { ascending: false });
+      if (staffId) query = query.eq('staff_id', staffId);
+      return query;
+    }) as unknown as StaffAttendance[];
   }
 
   async listTransactions(fromDate: string, toDate: string): Promise<FinancialTransaction[]> {
-    const result = await this.supabase.client.from('financial_transactions').select('id,transaction_date,type,category,description,amount,created_at').gte('transaction_date', fromDate).lte('transaction_date', toDate).order('transaction_date', { ascending: false }).order('created_at', { ascending: false });
-    return this.value(result) as FinancialTransaction[];
+    return await this.read(() => this.supabase.client.from('financial_transactions').select('id,transaction_date,type,category,description,amount,created_at').gte('transaction_date', fromDate).lte('transaction_date', toDate).order('transaction_date', { ascending: false }).order('created_at', { ascending: false })) as unknown as FinancialTransaction[];
   }
 
   dashboard(fromDate: string, toDate: string): Promise<DashboardSummary> {

@@ -44,7 +44,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
         run: |
-          for function_name in health dashboard-summary admin-master-data generate-class-sessions attendance-bulk-upsert evaluation-bulk-upsert staff-attendance invite-staff-account record-financial-transaction; do
+          for function_name in health dashboard-summary admin-master-data generate-class-sessions attendance-bulk-upsert evaluation-bulk-upsert staff-attendance invite-staff-account record-financial-transaction root-auth root-admin-accounts; do
             npx supabase functions deploy "$function_name" --project-ref "$SUPABASE_PROJECT_REF" --use-api
           done
       - name: List deployed functions

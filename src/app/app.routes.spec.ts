@@ -15,4 +15,10 @@ describe('minimal routes', () => {
     expect(children.find((route) => route.path === 'staff')?.data).toMatchObject({ roles: ['ADMIN'] });
     expect(children.find((route) => route.path === 'finance')?.data).toMatchObject({ roles: ['ADMIN'] });
   });
+
+  it('exposes Root account control separately from the Supabase-authenticated shell', () => {
+    const rootRoute = routes.find((route) => route.path === 'root/admins');
+    expect(rootRoute?.canActivate).toHaveLength(1);
+    expect(rootRoute?.loadComponent).toBeTypeOf('function');
+  });
 });
