@@ -153,7 +153,13 @@ CI cần:
 
 - GitHub Secret `SUPABASE_ACCESS_TOKEN`;
 - GitHub Secret `SUPABASE_DB_PASSWORD`;
-- GitHub Variable `SUPABASE_PROJECT_REF`.
+- GitHub Variable `SUPABASE_PROJECT_REF` (tùy chọn; workflow fallback về
+  `supabase/config.toml` nếu biến không có).
+
+Workflow validate access token phải bắt đầu bằng `sbp_`, database password
+không rỗng và project ref 20 ký tự chữ thường/số trước khi gọi Supabase CLI.
+Nếu dùng Environment Secrets/Variables, job phải khai báo đúng `environment`;
+mặc định workflow đọc Repository Secrets/Variables.
 
 Không hard-code các giá trị secret vào workflow/source.
 

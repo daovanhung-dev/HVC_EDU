@@ -115,14 +115,20 @@ Nếu dùng custom domain ở root, đổi `--base-href` thành `/`.
 
 ## 7. Deploy Supabase
 
-Tạo GitHub variables/secrets:
+Tạo GitHub Repository Variable/Secrets:
 
 Variables:
-- `SUPABASE_PROJECT_REF`
+- `SUPABASE_PROJECT_REF` (tùy chọn; nếu bỏ trống workflow dùng `project_id` trong
+  `supabase/config.toml`)
 
 Secrets:
-- `SUPABASE_ACCESS_TOKEN`
-- `SUPABASE_DB_PASSWORD`
+- `SUPABASE_ACCESS_TOKEN` — Supabase Personal Access Token có dạng `sbp_...`.
+- `SUPABASE_DB_PASSWORD` — mật khẩu database remote.
+
+Workflow sẽ validate các giá trị trước bước `supabase link` và không in token
+hoặc mật khẩu vào log. Nếu dùng Environment Secrets/Variables thay vì cấp
+Repository, job phải khai báo đúng `environment` tương ứng; mặc định workflow
+này đọc Repository Secrets/Variables.
 
 Sau đó chạy workflow `Deploy Supabase` hoặc push thay đổi trong `supabase/**`.
 

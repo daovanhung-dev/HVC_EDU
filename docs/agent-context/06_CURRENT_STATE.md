@@ -52,11 +52,11 @@ Pipeline đã:
 
 Do đó nếu production UI lỗi, không mặc định chẩn đoán là "Pages chưa build"; phải xem route/base href/runtime API/auth cụ thể.
 
-## 4. Supabase deployment CI — cảnh báo hiện tại
+## 4. Supabase deployment CI — validation đã bổ sung
 
-Workflow `Deploy Supabase` ở HEAD hiện tại đang FAILURE tại bước `Link Supabase project`.
+Workflow `Deploy Supabase` trước đây FAILURE tại bước `Link Supabase project`.
 
-Log cho thấy trong GitHub Actions các biến sau được resolve thành rỗng tại job:
+Log cũ cho thấy trong GitHub Actions các biến sau được resolve thành rỗng tại job:
 
 - `SUPABASE_ACCESS_TOKEN`;
 - `SUPABASE_DB_PASSWORD`;
@@ -66,11 +66,16 @@ CLI báo access token chưa được cung cấp, sau đó các bước config/db
 
 Điều này là vấn đề **CI credential configuration**, không phải bằng chứng migration/code SQL hiện tại lỗi.
 
+Workflow hiện đã có bước `Validate Supabase Configuration` trước khi link. Bước
+này kiểm tra access token dạng `sbp_...`, database password và project ref; nếu
+project variable bị bỏ trống thì lấy `project_id` từ `supabase/config.toml` và
+đưa giá trị đã resolve vào `$GITHUB_ENV` cho các bước còn lại.
+
 Khi fix CI, cấu hình đúng:
 
-- Repository/Environment Secret `SUPABASE_ACCESS_TOKEN`;
-- Repository/Environment Secret `SUPABASE_DB_PASSWORD`;
-- Repository/Environment Variable `SUPABASE_PROJECT_REF`;
+- Repository Secret `SUPABASE_ACCESS_TOKEN`;
+- Repository Secret `SUPABASE_DB_PASSWORD`;
+- Repository Variable `SUPABASE_PROJECT_REF` (tùy chọn);
 - kiểm tra workflow có truy cập đúng scope/environment chứa các giá trị trên.
 
 Không commit credential vào YAML để chữa lỗi này.
