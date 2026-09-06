@@ -57,6 +57,13 @@ The supplied operational workbook is validated server-side, stored in the privat
 - When a visible active `class_schedules` row has no generated session in the selected range, Angular renders a `WEEKLY_SCHEDULE` read-only occurrence instead of fabricating a backend session.
 - Weekly occurrences are merged by `(class_id, session_date, start_time)` so a generated session is never duplicated; only real session IDs can reach attendance, evaluation or check-in routes.
 
+## Per-enrollment tuition override
+
+- Admin changes to an active enrollment's `unit_price_override` use audited `rpc_update_enrollment_unit_price`; direct browser enrollment writes remain revoked.
+- The override is an integer VND unit price. `null` means the enrollment uses the class price, while zero is a valid free unit price.
+- `LEFT` enrollment rows are terminal and read-only for price changes; re-entry creates a new enrollment row through the existing audited RPC.
+- The mutation updates enrollment configuration only. Existing tuition ledger snapshots are not rewritten; future generation uses the new override for new/DRAFT ledgers and preserves `CONFIRMED`, `PARTIAL`, `UNPAID` and `PAID` history.
+
 ## Rebuild workflow notes (2026-09-06)
 
 - The new Angular route tree is hub-first. Existing detail components remain available behind hub tabs or compatibility paths so class, student, finance, audit and import operations are not discarded during the transition.

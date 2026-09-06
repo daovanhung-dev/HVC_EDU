@@ -18,7 +18,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge.compo
     @if(error()){<div class="alert">{{error()}}</div>}
     @if(editing&&auth.role()==='ADMIN'){<form class="card form-card" (ngSubmit)="save()"><h2>Chỉnh sửa hồ sơ</h2><div class="form-grid"><label>Mã HS *<input name="code" [(ngModel)]="form.code" required /></label><label>Họ tên *<input name="full_name" [(ngModel)]="form.full_name" required /></label><label>SĐT học sinh<input name="phone" [(ngModel)]="form.phone" /></label><label>Tên phụ huynh<input name="parent_name" [(ngModel)]="form.parent_name" /></label><label>SĐT phụ huynh<input name="parent_phone" [(ngModel)]="form.parent_phone" /></label><label>Trạng thái<select name="status" [(ngModel)]="form.status"><option value="ACTIVE">Đang học</option><option value="INACTIVE">Tạm dừng</option></select></label><label class="full">Ghi chú<textarea name="note" rows="2" [(ngModel)]="form.note"></textarea></label></div><div class="form-actions"><button class="primary">Lưu thay đổi</button><button type="button" class="secondary" (click)="startEdit()">Hủy</button></div></form>}
     <div class="grid-2"><section class="card section-card"><h2>Thông tin</h2><div class="stat-list"><div><span>Phụ huynh</span><strong>{{student()?.parent_name||'—'}}</strong></div><div><span>Điện thoại</span><strong>{{student()?.phone||'—'}}</strong></div><div><span>Trạng thái</span><app-status-badge [value]="student()?.status" /></div></div></section>@if(financeVisible()){<section class="card section-card"><h2>Học phí</h2><div class="stat-list">@for(l of ledgers();track l.id){<div><span>{{l.period_id}}</span><strong>{{money(l.debt_amount)}} nợ</strong></div>}@empty{<p class="muted">Chưa có ledger.</p>}</div></section>}</div>
-    <section class="card section-card"><h2>Lớp học & lịch sử xếp lớp</h2><div class="table-wrap"><table><thead><tr><th>Lớp</th><th>Từ ngày</th><th>Đến ngày</th><th>Đơn giá</th><th>Trạng thái</th>@if(auth.role()==='ADMIN'){<th>Thao tác</th>}</tr></thead><tbody>@for(e of enrollments();track e.id){<tr><td>{{e.class?.code}} · {{e.class?.name}}</td><td>{{e.enrolled_from}}</td><td>{{e.enrolled_to||'—'}}</td><td>{{e.unit_price_override !== null && e.unit_price_override !== undefined?money(e.unit_price_override):'Theo lớp'}}</td><td>{{e.status==='ACTIVE'?'Đang học':'Đã rời lớp'}}</td>@if(auth.role()==='ADMIN'){<td>@if(e.status==='ACTIVE'){<input aria-label="Ngày rời lớp" type="date" [(ngModel)]="e.edit_enrolled_to" [name]="'enrolled_to_'+e.id" [min]="e.enrolled_from" /><button class="button-link" [disabled]="savingEnrollment()===e.id" (click)="leaveEnrollment(e)">{{savingEnrollment()===e.id?'Đang lưu…':'Cho nghỉ'}}</button>}@else{<span class="muted">Không mở lại</span>}</td>}</tr>}@empty{<tr><td [attr.colspan]="auth.role()==='ADMIN'?6:5" class="empty">Chưa xếp lớp.</td></tr>}</tbody></table></div></section>
+    <section class="card section-card"><h2>Lớp học & lịch sử xếp lớp</h2><div class="table-wrap"><table><thead><tr><th>Lớp</th><th>Từ ngày</th><th>Đến ngày</th><th>Đơn giá</th><th>Trạng thái</th>@if(auth.role()==='ADMIN'){<th>Thao tác</th>}</tr></thead><tbody>@for(e of enrollments();track e.id){<tr><td>{{e.class?.code}} · {{e.class?.name}}</td><td>{{e.enrolled_from}}</td><td>{{e.enrolled_to||'—'}}</td><td>@if(auth.role()==='ADMIN' && e.status==='ACTIVE'){<input aria-label="Đơn giá riêng VND" type="number" min="0" step="1" placeholder="Theo lớp" [(ngModel)]="e.edit_unit_price_override" [name]="'unit_price_'+e.id" />}@else{<span>{{e.unit_price_override !== null && e.unit_price_override !== undefined?money(e.unit_price_override):'Theo lớp'}}</span>}</td><td>{{e.status==='ACTIVE'?'Đang học':'Đã rời lớp'}}</td>@if(auth.role()==='ADMIN'){<td>@if(e.status==='ACTIVE'){<button type="button" class="button-link" [disabled]="savingUnitPrice()===e.id" (click)="saveEnrollmentUnitPrice(e)">{{savingUnitPrice()===e.id?'Đang lưu…':'Lưu học phí'}}</button><input aria-label="Ngày rời lớp" type="date" [(ngModel)]="e.edit_enrolled_to" [name]="'enrolled_to_'+e.id" [min]="e.enrolled_from" /><button type="button" class="button-link" [disabled]="savingEnrollment()===e.id" (click)="leaveEnrollment(e)">{{savingEnrollment()===e.id?'Đang lưu…':'Cho nghỉ'}}</button>}@else{<span class="muted">Không mở lại</span>}</td>}</tr>}@empty{<tr><td [attr.colspan]="auth.role()==='ADMIN'?6:5" class="empty">Chưa xếp lớp.</td></tr>}</tbody></table></div>@if(auth.role()==='ADMIN'){<p class="form-help muted">Bỏ trống đơn giá để dùng học phí theo lớp. Thay đổi chỉ áp dụng cho các kỳ chưa snapshot; ledger lịch sử không bị sửa.</p>}</section>
     @if(auth.role()==='ADMIN'){<form class="card form-card" (ngSubmit)="createEnrollment()"><h2>Tạo enrollment mới</h2><p class="muted">Dùng thao tác này khi học sinh quay lại lớp; enrollment đã LEFT sẽ không được mở lại.</p><div class="form-grid"><label>Lớp *<select name="rejoin_class" [(ngModel)]="rejoinForm.class_id" required><option value="">Chọn lớp</option>@for(c of classes();track c.id){<option [value]="c.id">{{c.code}} · {{c.name}}</option>}</select></label><label>Ngày vào lớp *<input type="date" name="rejoin_date" [(ngModel)]="rejoinForm.enrolled_from" required /></label><label>Đơn giá riêng (VND)<input type="number" min="0" step="1" name="rejoin_fee" [(ngModel)]="rejoinForm.unit_price_override" /></label></div><button class="primary" type="submit">Tạo enrollment</button></form>}
     <div class="grid-2"><section class="card section-card"><h2>Chuyên cần kỳ hiện tại</h2><div class="table-wrap"><table><thead><tr><th>Lớp</th><th>Có mặt</th><th>Vắng</th><th>Có phép</th></tr></thead><tbody>@for(a of attendanceSummary();track a.class_id){<tr><td>{{a.class?.code||a.class_id}}</td><td>{{a.present_count}}</td><td>{{a.absent_count}}</td><td>{{a.excused_count}}</td></tr>}@empty{<tr><td colspan="4" class="empty">Chưa có dữ liệu.</td></tr>}</tbody></table></div></section><section class="card section-card"><h2>Đánh giá kỳ hiện tại</h2><div class="table-wrap"><table><thead><tr><th>Lớp</th><th>BTVN</th><th>Hiểu bài</th><th>Thái độ</th><th>Cập nhật</th></tr></thead><tbody>@for(a of evaluations();track a.class_id){<tr><td>{{a.class?.code||a.class_id}}</td><td>{{a.avg_homework||'—'}}</td><td>{{a.avg_understanding||'—'}}</td><td>{{a.avg_attitude||'—'}}</td><td>{{a.last_evaluated_at||'—'}}</td></tr>}@empty{<tr><td colspan="5" class="empty">Chưa có đánh giá.</td></tr>}</tbody></table></div></section></div>
   `,
@@ -33,6 +33,7 @@ export class StudentDetailComponent implements OnInit {
   evaluations = signal<any[]>([]);
   error = signal('');
   savingEnrollment = signal('');
+  savingUnitPrice = signal('');
   editing = false;
   rejoinForm = { class_id: '', enrolled_from: new Date().toISOString().slice(0, 10), unit_price_override: null as number | null };
   form = { code: '', full_name: '', phone: '', parent_name: '', parent_phone: '', status: 'ACTIVE', note: '' };
@@ -49,7 +50,7 @@ export class StudentDetailComponent implements OnInit {
 
     const enrollmentResult = await this.supabase.client.from('enrollments').select('id,enrolled_from,enrolled_to,unit_price_override,status,class:classes(code,name)').eq('student_id', this.id).order('enrolled_from', { ascending: false });
     if (enrollmentResult.error) { this.error.set(enrollmentResult.error.message); return; }
-    this.enrollments.set((enrollmentResult.data || []).map((row: any) => ({ ...row, edit_enrolled_to: row.enrolled_to || new Date().toISOString().slice(0, 10) })));
+    this.enrollments.set((enrollmentResult.data || []).map((row: any) => ({ ...row, edit_enrolled_to: row.enrolled_to || new Date().toISOString().slice(0, 10), edit_unit_price_override: row.unit_price_override ?? null })));
     if (this.auth.role() === 'ADMIN') {
       const classResult = await this.supabase.client.from('classes').select('id,code,name').eq('status', 'ACTIVE').order('grade');
       if (classResult.error) this.error.set(classResult.error.message); else this.classes.set(classResult.data || []);
@@ -89,6 +90,29 @@ export class StudentDetailComponent implements OnInit {
     if (result.error) this.error.set(result.error.message); else { this.toast.success('Đã cập nhật trạng thái xếp lớp.'); await this.load(); }
   }
 
+  async saveEnrollmentUnitPrice(enrollment: any) {
+    if (this.auth.role() !== 'ADMIN' || this.savingUnitPrice()) return;
+    const raw = enrollment.edit_unit_price_override;
+    const input = raw === null || raw === undefined ? '' : String(raw).trim();
+    const value = input === '' ? null : Number(input);
+    if (value !== null && (!Number.isSafeInteger(value) || value < 0)) {
+      this.error.set('Đơn giá riêng phải là số nguyên VND không âm hoặc để trống.');
+      return;
+    }
+    if (!this.confirm.ask(`Cập nhật học phí riêng cho ${this.student()?.full_name || 'học sinh'} tại ${enrollment.class?.code || 'lớp'} thành ${value === null ? 'Theo lớp' : this.money(value)}?`)) return;
+    this.error.set('');
+    this.savingUnitPrice.set(enrollment.id);
+    try {
+      const result = await this.supabase.client.rpc('rpc_update_enrollment_unit_price', { p_enrollment_id: enrollment.id, p_unit_price_override: value });
+      if (result.error) this.error.set(this.friendlyError(result.error));
+      else { this.toast.success('Đã cập nhật học phí riêng.'); await this.load(); }
+    } catch (error) {
+      this.error.set(this.friendlyError(error));
+    } finally {
+      this.savingUnitPrice.set('');
+    }
+  }
+
   async createEnrollment() {
     const fee = this.rejoinForm.unit_price_override;
     if (!this.rejoinForm.class_id || !this.rejoinForm.enrolled_from || fee !== null && (!Number.isSafeInteger(Number(fee)) || Number(fee) < 0)) { this.error.set('Vui lòng chọn lớp, ngày vào hợp lệ và đơn giá là số nguyên VND.'); return; }
@@ -100,4 +124,12 @@ export class StudentDetailComponent implements OnInit {
 
   financeVisible() { return ['ADMIN', 'ACCOUNTANT'].includes(this.auth.role() || ''); }
   money(v: unknown) { return formatMoney(Number(v || 0)); }
+  private friendlyError(error: any) {
+    const message = String(error?.message || error || '');
+    if (message.includes('ENROLLMENT_NOT_FOUND')) return 'Không tìm thấy enrollment hoặc enrollment không thuộc trung tâm.';
+    if (message.includes('ENROLLMENT_NOT_ACTIVE')) return 'Enrollment đã kết thúc; hãy tạo enrollment mới để đặt học phí.';
+    if (message.includes('VALIDATION_ERROR')) return 'Đơn giá riêng phải là số nguyên VND không âm hoặc để trống.';
+    if (message.includes('FORBIDDEN')) return 'Bạn không có quyền chỉnh sửa học phí riêng.';
+    return message || 'Không thể hoàn tất thao tác.';
+  }
 }

@@ -177,3 +177,19 @@ Verification:
 - `npm test`: PASS, 9 test files / 20 tests.
 - `npm run build`: PASS.
 - `deno check --no-config --node-modules-dir=auto supabase/functions/_shared/*.ts supabase/functions/*/index.ts`: PASS.
+
+## STEP 44 — Chỉnh học phí riêng theo học sinh
+
+Status: IMPLEMENTED IN WORKTREE; remote migration pending
+
+- Added Admin-only audited `rpc_update_enrollment_unit_price` for active enrollments; direct browser enrollment writes remain revoked.
+- Class detail roster and student detail enrollment history now support editing the per-enrollment unit price, including clearing it back to the class price.
+- Historical/closed enrollments remain read-only. Existing tuition ledger snapshots are not modified by the enrollment update.
+- Added unit coverage for numeric/null updates, validation and non-Admin mutation blocking.
+
+Verification:
+
+- `npm test`: PASS, 11 test files / 26 tests.
+- `npm run build`: PASS.
+- `deno check --no-config --node-modules-dir=auto supabase/functions/_shared/*.ts supabase/functions/*/index.ts`: PASS.
+- Remote migration deployment is pending; apply the additive migration through the normal Supabase CI/deployment path before using the new action in production.
