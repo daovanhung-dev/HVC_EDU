@@ -7,7 +7,13 @@ describe('workflow routes', () => {
   it('keeps canonical hubs for the rebuilt workflow', () => {
     expect(children.map((route) => route.path)).toEqual(expect.arrayContaining([
       'dashboard', 'periods', 'classes', 'students', 'teaching-schedule', 'work', 'staff', 'finance', 'notifications', 'account', 'settings',
+      'my-classes', 'my-classes/:classId',
     ]));
+  });
+
+  it('protects My Classes for teaching roles', () => {
+    expect(children.find((route) => route.path === 'my-classes')?.data).toMatchObject({ roles: ['ADMIN', 'TEACHER', 'ASSISTANT'] });
+    expect(children.find((route) => route.path === 'my-classes/:classId')?.data).toMatchObject({ roles: ['ADMIN', 'TEACHER', 'ASSISTANT'] });
   });
 
   it('maps legacy bookmarks to the new hubs', () => {

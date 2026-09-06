@@ -39,6 +39,18 @@ The supplied operational workbook is validated server-side, stored in the privat
 - An empty class may be physically deleted with its weekly schedules; a class referenced by enrollment, sessions, assignments, rewards, finance, payroll or period snapshots is deactivated instead so history remains intact.
 - Deactivation disables active schedules and non-closed period class configurations, and session generation rejects inactive classes.
 
+## Class schedule editing
+
+- Schedule changes use Admin-only `rpc_save_class_schedule` with validation and audit logging.
+- An already-effective schedule is never rewritten: the old row is closed/deactivated and a new effective-dated row is created. Existing `class_sessions` remain unchanged; the new schedule is used by later session generation.
+- Direct authenticated schedule writes are revoked. Class creation, month setup and import continue to write schedules through their security-definer transactional RPCs.
+
+## Teaching “My Classes” view
+
+- `TEACHER` and `ASSISTANT` receive a dedicated `/my-classes` navigation item and read-only detail route.
+- Current classes are derived from active, date-effective `class_assignments`; class/student/session/attendance/evaluation reads remain protected by existing center and assignment-aware RLS.
+- The view shows all accessible session history for the assigned class but only active enrollment/student rows, with no finance or admin mutation surface.
+
 ## Rebuild workflow notes (2026-09-06)
 
 - The new Angular route tree is hub-first. Existing detail components remain available behind hub tabs or compatibility paths so class, student, finance, audit and import operations are not discarded during the transition.

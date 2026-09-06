@@ -128,3 +128,34 @@ Verification:
 - Remote migration list: `202609060001` and `202609060002` present.
 - Admin JWT smoke call to `rpc_delete_class` with an unknown UUID returned the expected `CLASS_NOT_FOUND` without changing data.
 - Angular `npm test` / `npm run build`: NOT RUN in this runner because `node`, `npm` and `npx` are unavailable.
+
+## STEP 42 — Lớp của tôi cho giáo viên/trợ giảng
+
+Status: IMPLEMENTED IN WORKTREE; frontend build pending
+
+- Added the teaching-only `Lớp của tôi` sidebar item and protected `/my-classes` and `/my-classes/:classId` routes.
+- Added read-only class and history service using existing assignment-aware RLS; only current assignments and active students are shown.
+- Added class overview/detail cards for weekly schedules, student contact information, all accessible session history, attendance summaries and evaluation comments/scores.
+- No financial data or administrative mutations are exposed in the teaching view.
+
+Verification:
+
+- Navigation and route role tests updated for Teacher/Assistant access and Admin/Accountant menu exclusion.
+- `git diff --check`: PASS.
+- `npm test` / `npm run build`: NOT RUN in this runner because `node`, `npm` and `npx` are unavailable.
+
+## STEP 41 — Sửa lịch học theo phiên bản
+
+Status: IMPLEMENTED; remote migration applied
+
+- Added the Admin-only `rpc_save_class_schedule` mutation with schedule validation and audit logging.
+- Editing an already-effective schedule closes the old version and creates a new version from the effective date; generated sessions and prior schedule history are preserved.
+- The class schedule screen now supports adding and editing weekday/time/effective-date values; schedule writes no longer use the browser Data API directly.
+- Direct authenticated insert/update/delete grants for `class_schedules` are revoked; server-side class/month setup/import workflows retain their security-definer path.
+
+Verification:
+
+- Migration `202609060003_class_schedule_edit.sql` applied to the linked remote project.
+- Admin RPC smoke call rejected an unknown class with `CLASS_NOT_FOUND` without changing data.
+- Remote migration list and `deno check` passed.
+- Angular `npm test` / `npm run build`: NOT RUN in this runner because `node`, `npm` and `npx` are unavailable.

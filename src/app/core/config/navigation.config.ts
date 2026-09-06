@@ -17,6 +17,7 @@ const teaching: AppRole[] = ['ADMIN', 'TEACHER', 'ASSISTANT'];
 export const NAVIGATION_ITEMS: NavigationItem[] = [
   { id: 'home', path: '/dashboard', label: 'Trang chủ', description: 'Việc cần làm và lịch hôm nay', icon: 'dashboard', roles: all },
   { id: 'months', path: '/periods', label: 'Tháng', description: 'Tạo, vận hành và chốt tháng', icon: 'calendar', roles: admin },
+  { id: 'my-classes', path: '/my-classes', label: 'Lớp của tôi', description: 'Lịch, học sinh và lịch sử', icon: 'school', roles: ['TEACHER', 'ASSISTANT'] },
   { id: 'classes', path: '/classes', label: 'Lớp', description: 'Lớp, học sinh và lịch học', icon: 'school', roles: ['ADMIN', 'ACCOUNTANT'] },
   { id: 'students', path: '/students', label: 'Học sinh', description: 'Roster, học phí và lịch sử', icon: 'student', roles: ['ADMIN', 'ACCOUNTANT'] },
   { id: 'teaching-schedule', path: '/teaching-schedule', label: 'Lịch dạy', description: 'Buổi học, điểm danh và check-in', icon: 'attendance', roles: teaching },

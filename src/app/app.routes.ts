@@ -18,6 +18,8 @@ export const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       { path: 'dashboard', data: { roles: all }, canActivate: [roleGuard], loadComponent: () => import('./features/home/home.component').then((m) => m.HomeComponent) },
       { path: 'periods', data: { roles: admin }, canActivate: [roleGuard], loadComponent: () => import('./features/month-setup/month-setup.component').then((m) => m.MonthSetupComponent) },
+      { path: 'my-classes/:classId', data: { roles: teaching }, canActivate: [roleGuard], loadComponent: () => import('./features/teaching/my-class-detail.component').then((m) => m.MyClassDetailComponent) },
+      { path: 'my-classes', data: { roles: teaching }, canActivate: [roleGuard], loadComponent: () => import('./features/teaching/my-classes.component').then((m) => m.MyClassesComponent) },
       { path: 'classes/new', data: { roles: admin }, canActivate: [roleGuard], loadComponent: () => import('./features/classes/class-form.component').then((m) => m.ClassFormComponent) },
       { path: 'classes/:id/schedule', data: { roles: teaching }, canActivate: [roleGuard], loadComponent: () => import('./features/classes/class-schedule.component').then((m) => m.ClassScheduleComponent) },
       { path: 'classes/:id', data: { roles: all }, canActivate: [roleGuard], loadComponent: () => import('./features/classes/class-detail.component').then((m) => m.ClassDetailComponent) },
